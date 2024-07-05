@@ -31,9 +31,11 @@ void Solution::calculateCosts() {
     // Calculate travel costs
     for (int t = 0; t < irp.nPeriods; ++t) {
         for (const auto& vehicle : vehicleRoutes[t]) {
-            for (const auto& route : vehicle) {
-                routeCost += route.routeCost;
+            double vehicleRouteCost = 0.0;
+            for (size_t i = 0; i < vehicle.route.size() - 1; ++i) {
+                vehicleRouteCost += irp.costMatrix[vehicle.route[i].first][vehicle.route[i + 1].first];
             }
+            routeCost += vehicleRouteCost;
         }
     }
 
@@ -67,12 +69,12 @@ bool Solution::isFeasible() const {
         std::vector<int> visits(irp.customers.size(), 0);
         for (const auto& vehicle : vehicleRoutes[t]) {
             int vehicleLoad = 0;
-            if (vehicle.front().route.first != 0 || vehicle.back().route.first != 0) {
+            if (vehicle.route.front().first != 0 || vehicle.route.back().first != 0) {
                 std::cerr << "Vehicle does not start and end at the depot in period " << t << std::endl;
                 return false;
             }
-            for (const auto& route : vehicle) {
-                int customerId = route.route.first;
+            for (const auto& route : vehicle.route) {
+                int customerId = route.first;
                 if (customerId != 0) {  // Only depot 0 can be visited more than once
                     visits[customerId]++;
                     if (visits[customerId] > 1) {
@@ -80,7 +82,7 @@ bool Solution::isFeasible() const {
                         return false;
                     }
                 }
-                vehicleLoad += route.route.second;
+                vehicleLoad += route.second;
             }
             // Check if vehicle load exceeds capacity
             if (vehicleLoad > irp.Capacity) {
@@ -98,8 +100,8 @@ void Solution::printSolution() const {
         std::cout << "Period " << t << ":\n";
         for (const auto& vehicle : vehicleRoutes[t]) {
             std::cout << "  Route: ";
-            for (const auto& route : vehicle) {
-                std::cout << "<Cliente " << route.route.first << ", Quantidade entregue: " << route.route.second << "> ";
+            for (const auto& route : vehicle.route) {
+                std::cout << "<Cliente " << route.first << ", Quantidade entregue: " << route.second << "> ";
             }
             std::cout << "\n";
         }

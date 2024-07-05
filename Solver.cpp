@@ -1,24 +1,18 @@
 #include "Solver.h"
 #include <algorithm>
 #include <iostream>
+#include <fstream>
+#include <cstdlib>
 
 Solver::Solver(const IRP& irp) : irp(irp) {
     std::random_device rd;
     rng.seed(rd());
-    printSeed();
-}
-
-void Solver::printSeed() {
-    std::cout << "Random seed: " << rng() << std::endl;
 }
 
 void Solver::updateInventory(int period, int customerId, std::vector<std::vector<int>>& currentInventory, int deliveryAmount) {
-    std::cout << "Updating inventory for Customer " << customerId << " at Period " << period << std::endl;
     if (period < irp.customers[customerId].demand.size() && period < currentInventory[customerId].size()) {
         int newInventory = currentInventory[customerId][period] - irp.customers[customerId].demand[period] + deliveryAmount;
         currentInventory[customerId][period] = newInventory;
-    } else {
-        std::cerr << "Error: Period " << period << " is out of range for customer demand or inventory." << std::endl;
     }
 }
 
@@ -26,7 +20,7 @@ int Solver::calculateInsertionCost1(const std::vector<Route>& route, int custome
     double minDistance = std::numeric_limits<double>::max();
     int bestPosition = -1;
     for (int i = 0; i < route.size(); ++i) {
-        int lastCustomer = route[i].route.first;
+        int lastCustomer = route[i].route.back().first;
         double distance = irp.costMatrix[lastCustomer][customerId];
         if (distance < minDistance) {
             minDistance = distance;
@@ -36,10 +30,10 @@ int Solver::calculateInsertionCost1(const std::vector<Route>& route, int custome
     return bestPosition;
 }
 
-double Solver::calculateRouteCost(const std::vector<Route>& route) {
+double Solver::calculateRouteCost(const Route& route) {
     double cost = 0.0;
-    for (size_t i = 0; i < route.size() - 1; ++i) {
-        cost += irp.costMatrix[route[i].route.first][route[i + 1].route.first];
+    for (size_t i = 0; i < route.route.size() - 1; ++i) {
+        cost += irp.costMatrix[route.route[i].first][route.route[i + 1].first];
     }
     return cost;
 }
@@ -52,9 +46,9 @@ Solution Solver::buildRoutes(int period, int dmax, std::vector<std::vector<int>>
     std::vector<Vehicle> vehicles;
     for (int i = 0; i < irp.Fleet_Size; ++i) {
         vehicles.emplace_back(i, irp.Capacity, irp.depots[0].id);
-        solution.vehicleRoutes[period].emplace_back(); // Add a new vector<Route> for each vehicle
-        // Start and end each vehicle's route at the depot
-        solution.vehicleRoutes[period][i].push_back(Route(irp.depots[0].id, 0, 0.0));
+        solution.vehicleRoutes[period].emplace_back(); // Add a new Route for each vehicle
+        // Start each vehicle's route at the depot
+        solution.vehicleRoutes[period][i].route.push_back({irp.depots[0].id, 0});
     }
 
     std::vector<int> candidateList;
@@ -78,7 +72,6 @@ Solution Solver::buildRoutes(int period, int dmax, std::vector<std::vector<int>>
         for (int j = 0; j < candidateList.size(); ++j) {
             int customerId = candidateList[j];
             if (customerId >= irp.customers.size() || period >= irp.customers[customerId].demand.size() || customerServed[customerId]) {
-                std::cerr << "Error: Invalid customer or period index or customer already served." << std::endl;
                 continue;
             }
 
@@ -95,7 +88,6 @@ Solution Solver::buildRoutes(int period, int dmax, std::vector<std::vector<int>>
         }
 
         if (nearestVehicleIndex == -1 || nearestCustomerIndex == -1) {
-            std::cerr << "No feasible routes found. Exiting loop." << std::endl;
             break; // No more feasible routes
         }
 
@@ -122,14 +114,16 @@ Solution Solver::buildRoutes(int period, int dmax, std::vector<std::vector<int>>
         vehicles[nearestVehicleIndex].currentLocation = customerId;
 
         // Record the route
-        solution.vehicleRoutes[period][nearestVehicleIndex].push_back(Route(customerId, deliveryAmount, routeCost));
+        solution.vehicleRoutes[period][nearestVehicleIndex].route.push_back({customerId, deliveryAmount});
+        solution.vehicleRoutes[period][nearestVehicleIndex].routeCost += routeCost;
     }
 
     // Ensure all vehicles return to the depot
     for (auto& vehicle : vehicles) {
         double routeCost = irp.costMatrix[vehicle.currentLocation][irp.depots[0].id];
         vehicle.returnToDepot(irp.depots[0].id);
-        solution.vehicleRoutes[period][vehicle.id].push_back(Route(irp.depots[0].id, 0, routeCost));
+        solution.vehicleRoutes[period][vehicle.id].route.push_back({irp.depots[0].id, 0});
+        solution.vehicleRoutes[period][vehicle.id].routeCost += routeCost;
     }
 
     solution.currentInventory = currentInventory;
@@ -145,7 +139,6 @@ Solution Solver::solve(int dmax) {
 
     Solution bestSolution(irp);
     for (int t = 0; t < irp.nPeriods; ++t) {
-        std::cout << "Building routes for Period " << t << std::endl;
         Solution periodSolution = buildRoutes(t, dmax, currentInventory);
         bestSolution.vehicleRoutes[t] = periodSolution.vehicleRoutes[t];
         bestSolution.currentInventory = periodSolution.currentInventory;
@@ -155,39 +148,106 @@ Solution Solver::solve(int dmax) {
     return bestSolution;
 }
 
+void Solver::twoOpt(Route& route) {
+    int n = route.route.size();
+    if (n <= 2) return; // No need to optimize routes with less than 3 points
+
+    bool improvement = true;
+    while (improvement) {
+        improvement = false;
+        for (int i = 1; i < n - 2; ++i) {  // Skip the first and last element (depot)
+            for (int j = i + 1; j < n - 1; ++j) {  // Skip the first and last element (depot)
+                if (j - i == 1) continue; // Skip adjacent points
+
+                // Calculate the cost of the current and new segments
+                double oldCost = irp.costMatrix[route.route[i - 1].first][route.route[i].first] +
+                                 irp.costMatrix[route.route[j].first][route.route[j + 1].first];
+
+                double newCost = irp.costMatrix[route.route[i - 1].first][route.route[j].first] +
+                                 irp.costMatrix[route.route[i].first][route.route[j + 1].first];
+
+                if (newCost < oldCost) {
+                    std::reverse(route.route.begin() + i, route.route.begin() + j + 1);
+                    improvement = true;
+
+                    // Recalculate the route cost
+                    route.routeCost = calculateRouteCost(route);
+                }
+            }
+        }
+    }
+}
+
+void Solver::swap(Route& route) {
+    int n = route.route.size();
+    if (n <= 2) return; // No need to optimize routes with less than 3 points
+
+    bool improvement = true;
+    while (improvement) {
+        improvement = false;
+        for (int i = 1; i < n - 1; ++i) {  // Skip the first and last element (depot)
+            for (int j = i + 1; j < n - 1; ++j) {  // Skip the first and last element (depot)
+                // Swap customers
+                std::swap(route.route[i], route.route[j]);
+
+                // Recalculate the route cost
+                double newCost = calculateRouteCost(route);
+                if (newCost < route.routeCost) {
+                    route.routeCost = newCost;
+                    improvement = true;
+                } else {
+                    // Swap back if no improvement
+                    std::swap(route.route[i], route.route[j]);
+                }
+            }
+        }
+    }
+}
+
+void Solver::relocate(Route& route) {
+    int n = route.route.size();
+    if (n <= 2) return; // No need to optimize routes with less than 3 points
+
+    bool improvement = true;
+    while (improvement) {
+        improvement = false;
+        for (int i = 1; i < n - 1; ++i) {  // Skip the first and last element (depot)
+            auto customer = route.route[i];
+            for (int j = 1; j < n - 1; ++j) {
+                if (i == j) continue;
+
+                // Remove and insert customer at new position
+                route.route.erase(route.route.begin() + i);
+                route.route.insert(route.route.begin() + j, customer);
+
+                // Recalculate the route cost
+                double newCost = calculateRouteCost(route);
+                if (newCost < route.routeCost) {
+                    route.routeCost = newCost;
+                    improvement = true;
+                    break;
+                } else {
+                    // Revert changes if no improvement
+                    route.route.erase(route.route.begin() + j);
+                    route.route.insert(route.route.begin() + i, customer);
+                }
+            }
+            if (improvement) break;
+        }
+    }
+}
+
 Solution Solver::localSearch(Solution& solution) {
     for (int t = 0; t < irp.nPeriods; ++t) {
         for (auto& vehicle : solution.vehicleRoutes[t]) {
-            int n = vehicle.size();
-            if (n <= 2) continue; // No need to optimize routes with less than 3 points
+            // Apply 2-opt
+            twoOpt(vehicle);
 
-            bool improvement = true;
-            while (improvement) {
-                improvement = false;
-                for (int i = 1; i < n - 2; ++i) {  // Skip the first and last element (depot)
-                    for (int j = i + 1; j < n - 1; ++j) {  // Skip the first and last element (depot)
-                        if (j - i == 1) continue; // Skip adjacent points
+            // Apply swap
+            swap(vehicle);
 
-                        // Calculate the cost of the current and new segments
-                        double oldCost = irp.costMatrix[vehicle[i - 1].route.first][vehicle[i].route.first] +
-                                         irp.costMatrix[vehicle[j].route.first][vehicle[j + 1].route.first];
-
-                        double newCost = irp.costMatrix[vehicle[i - 1].route.first][vehicle[j].route.first] +
-                                         irp.costMatrix[vehicle[i].route.first][vehicle[j + 1].route.first];
-
-                        if (newCost < oldCost) {
-                            std::reverse(vehicle.begin() + i, vehicle.begin() + j + 1);
-                            improvement = true;
-
-                            // Recalculate the route cost
-                            double routeCost = calculateRouteCost(vehicle);
-                            for (auto& route : vehicle) {
-                                route.routeCost = routeCost;
-                            }
-                        }
-                    }
-                }
-            }
+            // Apply relocate
+            relocate(vehicle);
         }
     }
 
@@ -211,4 +271,38 @@ Solution Solver::findBestSolution(int n, int dmax) {
     }
 
     return bestSolution;
+}
+
+void Solver::saveSolutionToFile(const Solution& solution, const std::string& filename) {
+    std::ofstream file(filename);
+
+    if (!file) {
+        std::cerr << "Unable to open file: " << filename << std::endl;
+        return;
+    }
+
+    for (int t = 0; t < irp.nPeriods; ++t) {
+        file << "Period " << t << ":\n";
+        for (const auto& vehicle : solution.vehicleRoutes[t]) {
+            file << "  Vehicle " << &vehicle - &solution.vehicleRoutes[t][0] << ": ";
+            for (const auto& route : vehicle.route) {
+                file << "(" << route.first << ", " << route.second << ") ";
+            }
+            file << "\n";
+        }
+    }
+
+    file << "Inventory levels:\n";
+    for (int t = 0; t < irp.nPeriods; ++t) {
+        file << "Period " << t << ":\n";
+        for (int i = 0; i < irp.customers.size(); ++i) {
+            file << "  Customer " << irp.customers[i].id << ": " << solution.currentInventory[i][t] << "\n";
+        }
+    }
+
+    file.close();
+
+    // Call the Python script to plot the solution
+    std::string command = "python3 plot_solution.py " + filename;
+    system(command.c_str());
 }

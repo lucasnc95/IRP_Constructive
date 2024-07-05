@@ -4,21 +4,19 @@
 #include "IRP.h"
 #include <vector>
 #include <utility>
-//#include <Route.h>
 
 class Route {
 public:
-    std::pair<int, int> route; // (customer_id, delivery_amount)
+    std::vector<std::pair<int, int>> route; // Vector of (customer_id, delivery_amount) pairs
     double routeCost;
 
-    Route(int customerId, int deliveryAmount, double cost)
-        : route(customerId, deliveryAmount), routeCost(cost) {}
+    Route() : routeCost(0.0) {}
 };
 
 class Solution {
 public:
     const IRP& irp;
-    std::vector<std::vector<std::vector<Route>>> vehicleRoutes;
+    std::vector<std::vector<Route>> vehicleRoutes;
     std::vector<std::vector<int>> currentInventory;
     double routeCost;
     double inventoryCost;

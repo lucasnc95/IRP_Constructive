@@ -20,7 +20,11 @@ public:
     Solution buildRoutes(int period, int dmax, std::vector<std::vector<int>>& currentInventory);
     Solution localSearch(Solution& solution);
     Solution findBestSolution(int n, int dmax);
-    double calculateRouteCost(const std::vector<Route>& route);
+    double calculateRouteCost(const Route& route);
+    void relocate(Route& route);
+    void swap(Route& route);
+    void twoOpt(Route& route);
+    void saveSolutionToFile(const Solution& solution, const std::string& filename);
     void printSeed();
 };
 

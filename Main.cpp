@@ -13,10 +13,20 @@ int main(int argc, char* argv[]) {
 
     Solver solver(irp);
 
-    int dmax = 3; // Define dmax as needed
-    int n = 10; // Number of solutions to generate
+    int dmax = 6;//irp.nPeriods; // Define dmax as needed
+    int n = 5000; // Number of solutions to generate
     Solution bestSolution = solver.findBestSolution(n, dmax);
-
+    bestSolution.printSolution();
+   // bestSolution.calculateCosts();
+    double totalRouteCost = bestSolution.routeCost;
+    double totalInventoryCost = bestSolution.inventoryCost;
+    double totalCost = totalRouteCost + totalInventoryCost;
+    std::cout << "Custo Total das Rotas: " << totalRouteCost << std::endl;
+    std::cout << "Custo Total do Inventário: " << totalInventoryCost << std::endl;
+    std::cout << "Custo Total: " << totalCost << std::endl;
+    bool factivel = bestSolution.isFeasible();
+    std::cout << "A solução encontrada é factível? " << (factivel ? "Sim" : "Não") << std::endl;
+   // bestSolution.printInventoryLevels(irp.nPeriods-1);
     std::string outputFilename = "solution.txt";
     solver.saveSolutionToFile(bestSolution, outputFilename);
 

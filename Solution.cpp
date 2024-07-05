@@ -51,13 +51,13 @@ void Solution::calculateCosts() {
 
 bool Solution::isFeasible() const {
     // Check inventory levels and customer visits
-    for (int i = 0; i < irp.customers.size(); ++i) {
+    for (int i = 1; i <= irp.nCustomers; ++i) {  // Clientes vão de 1 a irp.nCustomers
         for (int t = 0; t < irp.nPeriods; ++t) {
             if (currentInventory[i][t] < 0) {
                 std::cerr << "Customer " << i << " has negative inventory at period " << t << std::endl;
                 return false;
             }
-            if (currentInventory[i][t] > irp.customers[i].maxLevelInv) {
+            if (currentInventory[i][t] > irp.customers[i-1].maxLevelInv) {
                 std::cerr << "Customer " << i << " exceeds max inventory level at period " << t << std::endl;
                 return false;
             }
@@ -66,7 +66,7 @@ bool Solution::isFeasible() const {
 
     // Check for multiple visits to the same customer in the same period
     for (int t = 0; t < irp.nPeriods; ++t) {
-        std::vector<int> visits(irp.customers.size(), 0);
+        std::vector<int> visits(irp.nCustomers + 1, 0);  // Clientes vão de 1 a irp.nCustomers
         for (const auto& vehicle : vehicleRoutes[t]) {
             int vehicleLoad = 0;
             if (vehicle.route.front().first != 0 || vehicle.route.back().first != 0) {
@@ -95,13 +95,14 @@ bool Solution::isFeasible() const {
     return true;
 }
 
+
 void Solution::printSolution() const {
     for (int t = 0; t < irp.nPeriods; ++t) {
         std::cout << "Period " << t << ":\n";
         for (const auto& vehicle : vehicleRoutes[t]) {
             std::cout << "  Route: ";
             for (const auto& route : vehicle.route) {
-                std::cout << "<Cliente " << route.first << ", Quantidade entregue: " << route.second << "> ";
+                std::cout << "(ID " << route.first << ",  " << route.second << ") ";
             }
             std::cout << "\n";
         }

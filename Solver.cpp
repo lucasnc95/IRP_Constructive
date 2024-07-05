@@ -8,13 +8,14 @@ Solver::Solver(const IRP& irp) : irp(irp) {
     std::random_device rd;
     rng.seed(rd());
 }
-
 void Solver::updateInventory(int period, int customerId, std::vector<std::vector<int>>& currentInventory, int deliveryAmount) {
-    if (period < irp.customers[customerId].demand.size() && period < currentInventory[customerId].size()) {
-        int newInventory = currentInventory[customerId][period] - irp.customers[customerId].demand[period] + deliveryAmount;
-        currentInventory[customerId][period] = newInventory;
+    if (customerId < 1 || customerId > irp.nCustomers || period >= irp.nPeriods) {
+        return;
     }
+    int newInventory = currentInventory[customerId][period] - irp.customers[customerId-1].demand[period] + deliveryAmount;
+    currentInventory[customerId][period] = newInventory;
 }
+
 
 int Solver::calculateInsertionCost1(const std::vector<Route>& route, int customerId) {
     double minDistance = std::numeric_limits<double>::max();
@@ -52,11 +53,11 @@ Solution Solver::buildRoutes(int period, int dmax, std::vector<std::vector<int>>
     }
 
     std::vector<int> candidateList;
-    std::vector<bool> customerServed(irp.customers.size(), false); // Track if a customer is already served
+    std::vector<bool> customerServed(irp.nCustomers + 1, false); // Track if a customer is already served
 
-    for (int i = 0; i < irp.customers.size(); ++i) {
-        if (currentInventory[i][period] - irp.customers[i].demand[period] < 0) { // Needs delivery if inventory - demand < 0
-            candidateList.push_back(irp.customers[i].id);
+    for (int i = 1; i <= irp.nCustomers; ++i) {
+        if (currentInventory[i][period] - irp.customers[i-1].demand[period] < 0) { // Needs delivery if inventory - demand < 0
+            candidateList.push_back(irp.customers[i-1].id);
         }
     }
 
@@ -71,13 +72,13 @@ Solution Solver::buildRoutes(int period, int dmax, std::vector<std::vector<int>>
 
         for (int j = 0; j < candidateList.size(); ++j) {
             int customerId = candidateList[j];
-            if (customerId >= irp.customers.size() || period >= irp.customers[customerId].demand.size() || customerServed[customerId]) {
+            if (customerId < 1 || customerId > irp.nCustomers || period >= irp.nPeriods || customerServed[customerId]) {
                 continue;
             }
 
             for (int i = 0; i < vehicles.size(); ++i) {
                 double distance = irp.costMatrix[vehicles[i].currentLocation][customerId];
-                if (distance < minDistance && vehicles[i].currentCapacity >= irp.customers[customerId].demand[period]) {
+                if (distance < minDistance && vehicles[i].currentCapacity >= irp.customers[customerId-1].demand[period]) {
                     minDistance = distance;
                     nearestVehicleIndex = i;
                     nearestCustomerIndex = j;
@@ -93,15 +94,15 @@ Solution Solver::buildRoutes(int period, int dmax, std::vector<std::vector<int>>
 
         // Calculate random delivery amount
         int customerId = candidateList[nearestCustomerIndex];
-        int d0 = irp.customers[customerId].demand[period];
+        int d0 = irp.customers[customerId-1].demand[period];
         int dmaxAdjusted = 0;
         for (int k = 0; k < dmax && (period + k) < irp.nPeriods; ++k) {
-            dmaxAdjusted += irp.customers[customerId].demand[period + k];
+            dmaxAdjusted += irp.customers[customerId-1].demand[period + k];
         }
         std::uniform_int_distribution<int> dist(0, dmaxAdjusted - d0);
         int randDelivery = dist(rng);
         int deliveryAmount = std::min(vehicles[nearestVehicleIndex].currentCapacity, d0 + randDelivery);
-        deliveryAmount = std::min(deliveryAmount, irp.customers[customerId].maxLevelInv - currentInventory[customerId][period] + irp.customers[customerId].demand[period]);
+        deliveryAmount = std::min(deliveryAmount, irp.customers[customerId-1].maxLevelInv - currentInventory[customerId][period] + irp.customers[customerId-1].demand[period]);
 
         // Visit the nearest customer
         vehicles[nearestVehicleIndex].visitCustomer(customerId, deliveryAmount);
@@ -132,9 +133,9 @@ Solution Solver::buildRoutes(int period, int dmax, std::vector<std::vector<int>>
 }
 
 Solution Solver::solve(int dmax) {
-    std::vector<std::vector<int>> currentInventory(irp.nCustomers, std::vector<int>(irp.nPeriods, 0));
-    for (int i = 0; i < irp.nCustomers; ++i) {
-        currentInventory[i][0] = irp.customers[i].initialInv;
+    std::vector<std::vector<int>> currentInventory(irp.nCustomers + 1, std::vector<int>(irp.nPeriods, 0));
+    for (int i = 1; i <= irp.nCustomers; ++i) {
+        currentInventory[i][0] = irp.customers[i-1].initialInv;
     }
 
     Solution bestSolution(irp);
@@ -147,6 +148,7 @@ Solution Solver::solve(int dmax) {
     bestSolution.calculateCosts();
     return bestSolution;
 }
+
 
 void Solver::twoOpt(Route& route) {
     int n = route.route.size();
@@ -240,13 +242,12 @@ void Solver::relocate(Route& route) {
 Solution Solver::localSearch(Solution& solution) {
     for (int t = 0; t < irp.nPeriods; ++t) {
         for (auto& vehicle : solution.vehicleRoutes[t]) {
-            // Apply 2-opt
+        
             twoOpt(vehicle);
-
-            // Apply swap
             swap(vehicle);
-
-            // Apply relocate
+            relocate(vehicle);
+            twoOpt(vehicle);
+            swap(vehicle);
             relocate(vehicle);
         }
     }
@@ -281,22 +282,35 @@ void Solver::saveSolutionToFile(const Solution& solution, const std::string& fil
         return;
     }
 
+    // Print all customers and depots with their coordinates
+    file << "Depots:\n";
+    for (const auto& depot : irp.depots) {
+        file << depot.id << " " << depot.x << " " << depot.y << "\n";
+    }
+
+    file << "Customers:\n";
+    for (const auto& customer : irp.customers) {
+        file << customer.id << " " << customer.x << " " << customer.y << "\n";
+    }
+
+    // Print the routes for each period and each vehicle
     for (int t = 0; t < irp.nPeriods; ++t) {
         file << "Period " << t << ":\n";
         for (const auto& vehicle : solution.vehicleRoutes[t]) {
-            file << "  Vehicle " << &vehicle - &solution.vehicleRoutes[t][0] << ": ";
+            file << "  Vehicle " << (&vehicle - &solution.vehicleRoutes[t][0]) << ": ";
             for (const auto& route : vehicle.route) {
-                file << "(" << route.first << ", " << route.second << ") ";
+                file << route.first << " ";
             }
             file << "\n";
         }
     }
 
+    // Print the inventory levels for each period and each customer
     file << "Inventory levels:\n";
     for (int t = 0; t < irp.nPeriods; ++t) {
         file << "Period " << t << ":\n";
-        for (int i = 0; i < irp.customers.size(); ++i) {
-            file << "  Customer " << irp.customers[i].id << ": " << solution.currentInventory[i][t] << "\n";
+        for (int i = 1; i <= irp.nCustomers; ++i) {
+            file << "  Customer " << irp.customers[i-1].id << ": " << solution.currentInventory[i][t] << "\n";
         }
     }
 

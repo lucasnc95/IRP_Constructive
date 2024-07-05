@@ -1,79 +1,82 @@
 import sys
+import os
 import matplotlib.pyplot as plt
-import numpy as np
+import networkx as nx
 
 def plot_routes(filename):
+    depots = {}
+    customers = {}
+    routes = []
+
     with open(filename, 'r') as file:
         lines = file.readlines()
 
-    periods = []
-    routes = {}
-    inventory_levels = {}
-    period = -1
-
+    section = None
     for line in lines:
-        if line.startswith("Period"):
+        if line.startswith("Depots:"):
+            section = "depots"
+        elif line.startswith("Customers:"):
+            section = "customers"
+        elif line.startswith("Period"):
+            section = "period"
             period = int(line.split()[1][:-1])
-            periods.append(period)
-            routes[period] = []
-        elif line.startswith("  Vehicle"):
-            vehicle_id = int(line.split()[1][:-1])
-            route = []
-            for pair in line.split(":")[1].strip().split(" "):
-                customer_id, amount = pair.strip("()").split(",")
-                route.append((int(customer_id), int(amount)))
-            routes[period].append(route)
-        elif line.startswith("Inventory levels"):
-            break
+            routes.append([])
+        elif line.startswith("Inventory levels:"):
+            section = "inventory"
+        elif section == "depots":
+            depot_info = list(map(float, line.strip().split()))
+            depots[int(depot_info[0])] = (depot_info[1], depot_info[2])
+        elif section == "customers":
+            customer_info = list(map(float, line.strip().split()))
+            customers[int(customer_info[0])] = (customer_info[1], customer_info[2])
+        elif section == "period":
+            if line.startswith("  Vehicle"):
+                vehicle_id = int(line.split()[1][:-1])
+                route = list(map(int, line.split(":")[1].strip().split()))
+                routes[-1].append((vehicle_id, route))
 
-    inventory_lines = lines[lines.index("Inventory levels:\n") + 1:]
-    period = -1
+    # Cores para os veículos (até 80 veículos)
+    colors = plt.cm.tab20(range(20))  # Usando um mapa de cores de 20 cores diferentes
 
-    for line in inventory_lines:
-        if line.startswith("Period"):
-            period = int(line.split()[1][:-1])
-            inventory_levels[period] = []
-        else:
-            customer_id = int(line.split()[1][:-1])
-            inventory = int(line.split(":")[1].strip())
-            inventory_levels[period].append((customer_id, inventory))
+    # Pasta para salvar os plots
+    plot_dir = 'Plots'
+    if not os.path.exists(plot_dir):
+        os.makedirs(plot_dir)
 
-    # Plot routes
-    plt.figure(figsize=(12, 8))
-    for period in periods:
-        plt.subplot(1, len(periods), period + 1)
-        for vehicle_route in routes[period]:
-            x_coords = []
-            y_coords = []
-            for customer_id, _ in vehicle_route:
-                if customer_id == 0:
-                    x, y = 0, 0  # Coordinates for the depot
-                else:
-                    customer = next(c for c in irp.customers if c.id == customer_id)
-                    x, y = customer.x, customer.y
-                x_coords.append(x)
-                y_coords.append(y)
-            plt.plot(x_coords, y_coords, marker='o')
-        plt.title(f'Period {period}')
-        plt.xlabel('X')
-        plt.ylabel('Y')
+    # Plotagem dos gráficos de rotas para cada período
+    for period in range(len(routes)):
+        if not routes[period]:
+            continue  # Pula períodos sem rotas
 
-    plt.tight_layout()
-    plt.savefig('routes.png')
+        G = nx.DiGraph()
 
-    # Plot inventory levels
-    plt.figure(figsize=(12, 8))
-    for period in periods:
-        customer_ids = [c[0] for c in inventory_levels[period]]
-        inventories = [c[1] for c in inventory_levels[period]]
-        plt.bar(customer_ids, inventories, label=f'Period {period}')
+        # Adiciona nós para depósitos e clientes
+        for depot_id, (x, y) in depots.items():
+            G.add_node(depot_id, pos=(x, y), color='red')
+        for customer_id, (x, y) in customers.items():
+            G.add_node(customer_id, pos=(x, y), color='blue')
 
-    plt.xlabel('Customer ID')
-    plt.ylabel('Inventory Level')
-    plt.legend()
-    plt.title('Inventory Levels Over Time')
-    plt.savefig('inventory_levels.png')
+        # Adiciona arestas para as rotas dos veículos
+        for i, (vehicle_id, route) in enumerate(routes[period]):
+            if len(route) > 2 or (len(route) == 2 and route[0] != route[1]):  # Ignora rotas 0 -> 0
+                for j in range(len(route) - 1):
+                    G.add_edge(route[j], route[j + 1], color=colors[i % 20], weight=2)
+
+        pos = nx.get_node_attributes(G, 'pos')
+        node_colors = [data['color'] for _, data in G.nodes(data=True)]
+        edge_colors = [data['color'] for _, _, data in G.edges(data=True)]
+
+        plt.figure(figsize=(25, 25))
+        nx.draw(G, pos, node_color=node_colors, edge_color=edge_colors, with_labels=True,
+                node_size=250, font_size=10, font_color='black', arrowsize=15, style='solid',
+                connectionstyle='arc3, rad=0.3')
+        plt.title(f'Period {period} - Vehicle Routes')
+        plt.savefig(os.path.join(plot_dir, f'routes_period_{period}.png'))
+        plt.close()
 
 if __name__ == "__main__":
-    filename = sys.argv[1]
-    plot_routes(filename)
+    if len(sys.argv) != 2:
+        print("Usage: python script.py input_filename")
+    else:
+        filename = sys.argv[1]
+        plot_routes(filename)

@@ -1,34 +1,23 @@
 #include "Solver.h"
 #include <algorithm>
-#include <iostream>
+#include <random>
+#include <vector>
 #include <fstream>
-#include <cstdlib>
+#include <iostream>
+#include <limits>
+#include <cmath>
 
 Solver::Solver(const IRP& irp) : irp(irp) {
     std::random_device rd;
     rng.seed(rd());
 }
+
 void Solver::updateInventory(int period, int customerId, std::vector<std::vector<int>>& currentInventory, int deliveryAmount) {
     if (customerId < 1 || customerId > irp.nCustomers || period >= irp.nPeriods) {
         return;
     }
     int newInventory = currentInventory[customerId][period] - irp.customers[customerId-1].demand[period] + deliveryAmount;
     currentInventory[customerId][period] = newInventory;
-}
-
-
-int Solver::calculateInsertionCost1(const std::vector<Route>& route, int customerId) {
-    double minDistance = std::numeric_limits<double>::max();
-    int bestPosition = -1;
-    for (int i = 0; i < route.size(); ++i) {
-        int lastCustomer = route[i].route.back().first;
-        double distance = irp.costMatrix[lastCustomer][customerId];
-        if (distance < minDistance) {
-            minDistance = distance;
-            bestPosition = i;
-        }
-    }
-    return bestPosition;
 }
 
 double Solver::calculateRouteCost(const Route& route) {
@@ -42,7 +31,7 @@ double Solver::calculateRouteCost(const Route& route) {
 Solution Solver::buildRoutes(int period, int dmax, std::vector<std::vector<int>>& currentInventory) {
     Solution solution(irp);
     solution.currentInventory = currentInventory;
-
+    double alpha = 0.4;
     // Reset vehicle capacities and routes at the beginning of each period
     std::vector<Vehicle> vehicles;
     for (int i = 0; i < irp.Fleet_Size; ++i) {
@@ -55,9 +44,18 @@ Solution Solver::buildRoutes(int period, int dmax, std::vector<std::vector<int>>
     std::vector<int> candidateList;
     std::vector<bool> customerServed(irp.nCustomers + 1, false); // Track if a customer is already served
 
+    // Build candidate list based on demand and alpha probability
     for (int i = 1; i <= irp.nCustomers; ++i) {
         if (currentInventory[i][period] - irp.customers[i-1].demand[period] < 0) { // Needs delivery if inventory - demand < 0
             candidateList.push_back(irp.customers[i-1].id);
+        } else {
+            // Check probability to add the customer even if inventory is sufficient
+            if (alpha > 0.0 && alpha < 1.0) {
+                double randomValue = static_cast<double>(rand()) / RAND_MAX;
+                if (randomValue < alpha) {
+                    candidateList.push_back(irp.customers[i-1].id);
+                }
+            }
         }
     }
 
@@ -149,7 +147,6 @@ Solution Solver::solve(int dmax) {
     return bestSolution;
 }
 
-
 void Solver::twoOpt(Route& route) {
     int n = route.route.size();
     if (n <= 2) return; // No need to optimize routes with less than 3 points
@@ -157,6 +154,8 @@ void Solver::twoOpt(Route& route) {
     bool improvement = true;
     while (improvement) {
         improvement = false;
+        double bestCost = route.routeCost;
+
         for (int i = 1; i < n - 2; ++i) {  // Skip the first and last element (depot)
             for (int j = i + 1; j < n - 1; ++j) {  // Skip the first and last element (depot)
                 if (j - i == 1) continue; // Skip adjacent points
@@ -168,14 +167,21 @@ void Solver::twoOpt(Route& route) {
                 double newCost = irp.costMatrix[route.route[i - 1].first][route.route[j].first] +
                                  irp.costMatrix[route.route[i].first][route.route[j + 1].first];
 
-                if (newCost < oldCost) {
+                double costImprovement = oldCost - newCost;
+
+                if (costImprovement > 0) {
                     std::reverse(route.route.begin() + i, route.route.begin() + j + 1);
                     improvement = true;
 
                     // Recalculate the route cost
                     route.routeCost = calculateRouteCost(route);
+                    bestCost = route.routeCost;
                 }
             }
+        }
+
+        if (!improvement) {
+            route.routeCost = bestCost;
         }
     }
 }
@@ -187,6 +193,8 @@ void Solver::swap(Route& route) {
     bool improvement = true;
     while (improvement) {
         improvement = false;
+        double bestCost = route.routeCost;
+
         for (int i = 1; i < n - 1; ++i) {  // Skip the first and last element (depot)
             for (int j = i + 1; j < n - 1; ++j) {  // Skip the first and last element (depot)
                 // Swap customers
@@ -194,7 +202,9 @@ void Solver::swap(Route& route) {
 
                 // Recalculate the route cost
                 double newCost = calculateRouteCost(route);
-                if (newCost < route.routeCost) {
+                double costImprovement = route.routeCost - newCost;
+
+                if (costImprovement > 0) {
                     route.routeCost = newCost;
                     improvement = true;
                 } else {
@@ -202,6 +212,10 @@ void Solver::swap(Route& route) {
                     std::swap(route.route[i], route.route[j]);
                 }
             }
+        }
+
+        if (!improvement) {
+            route.routeCost = bestCost;
         }
     }
 }
@@ -213,6 +227,8 @@ void Solver::relocate(Route& route) {
     bool improvement = true;
     while (improvement) {
         improvement = false;
+        double bestCost = route.routeCost;
+
         for (int i = 1; i < n - 1; ++i) {  // Skip the first and last element (depot)
             auto customer = route.route[i];
             for (int j = 1; j < n - 1; ++j) {
@@ -224,7 +240,9 @@ void Solver::relocate(Route& route) {
 
                 // Recalculate the route cost
                 double newCost = calculateRouteCost(route);
-                if (newCost < route.routeCost) {
+                double costImprovement = route.routeCost - newCost;
+
+                if (costImprovement > 0) {
                     route.routeCost = newCost;
                     improvement = true;
                     break;
@@ -236,19 +254,160 @@ void Solver::relocate(Route& route) {
             }
             if (improvement) break;
         }
+
+        if (!improvement) {
+            route.routeCost = bestCost;
+        }
     }
 }
 
-Solution Solver::localSearch(Solution& solution) {
-    for (int t = 0; t < irp.nPeriods; ++t) {
-        for (auto& vehicle : solution.vehicleRoutes[t]) {
-        
-            twoOpt(vehicle);
-            swap(vehicle);
-            relocate(vehicle);
-            twoOpt(vehicle);
-            swap(vehicle);
-            relocate(vehicle);
+void Solver::exchangeRoutes(Route& route1, Route& route2) {
+    bool improvement = false;
+    double bestImprovement = 0.0;
+    int best_i = -1, best_j = -1;
+
+    for (int i = 1; i < route1.route.size() - 1; ++i) {
+        for (int j = 1; j < route2.route.size() - 1; ++j) {
+            auto& customer1 = route1.route[i];
+            auto& customer2 = route2.route[j];
+
+            // Check if exchange is feasible
+            if (route1.remainingCapacity + customer1.second - customer2.second >= 0 &&
+                route2.remainingCapacity + customer2.second - customer1.second >= 0) {
+
+                // Calculate potential new costs
+                std::swap(customer1, customer2);
+                double newCost1 = calculateRouteCost(route1);
+                double newCost2 = calculateRouteCost(route2);
+                std::swap(customer1, customer2);
+
+                double costImprovement = (route1.routeCost + route2.routeCost) - (newCost1 + newCost2);
+
+                if (costImprovement > bestImprovement) {
+                    bestImprovement = costImprovement;
+                    best_i = i;
+                    best_j = j;
+                    improvement = true;
+                }
+            }
+        }
+    }
+
+    if (improvement) {
+        // Apply the best exchange found
+        std::swap(route1.route[best_i], route2.route[best_j]);
+        route1.routeCost = calculateRouteCost(route1);
+        route2.routeCost = calculateRouteCost(route2);
+        route1.remainingCapacity += route1.route[best_i].second - route2.route[best_j].second;
+        route2.remainingCapacity += route2.route[best_j].second - route1.route[best_i].second;
+    }
+}
+
+void Solver::relocateRoutes(Route& route1, Route& route2) {
+    bool improvement = false;
+    double bestImprovement = 0.0;
+    int best_i = -1, best_j = -1;
+
+    for (int i = 1; i < route1.route.size() - 1; ++i) {
+        auto customer = route1.route[i];
+
+        for (int j = 1; j < route2.route.size(); ++j) {
+            if (route2.remainingCapacity >= customer.second) {
+                // Calculate potential new costs
+                route1.route.erase(route1.route.begin() + i);
+                route2.route.insert(route2.route.begin() + j, customer);
+                double newCost1 = calculateRouteCost(route1);
+                double newCost2 = calculateRouteCost(route2);
+                route2.route.erase(route2.route.begin() + j);
+                route1.route.insert(route1.route.begin() + i, customer);
+
+                double costImprovement = (route1.routeCost + route2.routeCost) - (newCost1 + newCost2);
+
+                if (costImprovement > bestImprovement) {
+                    bestImprovement = costImprovement;
+                    best_i = i;
+                    best_j = j;
+                    improvement = true;
+                }
+            }
+        }
+    }
+
+    if (improvement) {
+        // Apply the best relocation found
+        auto customer = route1.route[best_i];
+        route1.route.erase(route1.route.begin() + best_i);
+        route2.route.insert(route2.route.begin() + best_j, customer);
+        route1.routeCost = calculateRouteCost(route1);
+        route2.routeCost = calculateRouteCost(route2);
+        route1.remainingCapacity += customer.second;
+        route2.remainingCapacity -= customer.second;
+    }
+}
+
+void Solver::swapRoutes(Route& route1, Route& route2) {
+    bool improvement = false;
+    double bestImprovement = 0.0;
+    int best_i = -1, best_j = -1;
+
+    for (int i = 1; i < route1.route.size() - 1; ++i) {
+        for (int j = 1; j < route2.route.size() - 1; ++j) {
+            auto& customer1 = route1.route[i];
+            auto& customer2 = route2.route[j];
+
+            // Check if swap is feasible
+            if (route1.remainingCapacity + customer1.second - customer2.second >= 0 &&
+                route2.remainingCapacity + customer2.second - customer1.second >= 0) {
+
+                // Calculate potential new costs
+                std::swap(customer1, customer2);
+                double newCost1 = calculateRouteCost(route1);
+                double newCost2 = calculateRouteCost(route2);
+                std::swap(customer1, customer2);
+
+                double costImprovement = (route1.routeCost + route2.routeCost) - (newCost1 + newCost2);
+
+                if (costImprovement > bestImprovement) {
+                    bestImprovement = costImprovement;
+                    best_i = i;
+                    best_j = j;
+                    improvement = true;
+                }
+            }
+        }
+    }
+
+    if (improvement) {
+        // Apply the best swap found
+        std::swap(route1.route[best_i], route2.route[best_j]);
+        route1.routeCost = calculateRouteCost(route1);
+        route2.routeCost = calculateRouteCost(route2);
+        route1.remainingCapacity += route1.route[best_i].second - route2.route[best_j].second;
+        route2.remainingCapacity += route2.route[best_j].second - route1.route[best_i].second;
+    }
+}
+
+Solution Solver::localSearchAcrossRoutes(Solution& solution, int iterations) {
+    std::random_device rd;
+    std::mt19937 g(rd());
+
+    for (int n = 0; n < iterations; ++n) {
+        for (int t = 0; t < irp.nPeriods; ++t) {
+            std::shuffle(solution.vehicleRoutes[t].begin(), solution.vehicleRoutes[t].end(), g);
+
+            for (size_t i = 0; i < solution.vehicleRoutes[t].size(); ++i) {
+                for (size_t j = i + 1; j < solution.vehicleRoutes[t].size(); ++j) {
+                    int localSearchType = std::uniform_int_distribution<int>(1, 3)(g);
+
+                    if (localSearchType == 1) {
+                        exchangeRoutes(solution.vehicleRoutes[t][i], solution.vehicleRoutes[t][j]);
+                    } else if (localSearchType == 2) {
+                        relocateRoutes(solution.vehicleRoutes[t][i], solution.vehicleRoutes[t][j]);
+                    } else if (localSearchType == 3) {
+                        swapRoutes(solution.vehicleRoutes[t][i], solution.vehicleRoutes[t][j]);
+                    }
+                }
+            }
         }
     }
 
@@ -256,13 +415,48 @@ Solution Solver::localSearch(Solution& solution) {
     return solution;
 }
 
+Solution Solver::localSearch(Solution& solution, int iterations) {
+    std::random_device rd;
+    std::mt19937 g(rd());
+
+    for (int n = 0; n < iterations; ++n) {
+        for (int t = 0; t < irp.nPeriods; ++t) {
+            for (auto& vehicle : solution.vehicleRoutes[t]) {
+                double bestCost = vehicle.routeCost;
+
+                // Randomly apply twoOpt, swap, and relocate with best improvement criteria
+                int localSearchType = std::uniform_int_distribution<int>(1, 3)(g);
+
+                if (localSearchType == 1) {
+                    twoOpt(vehicle);
+                } else if (localSearchType == 2) {
+                    swap(vehicle);
+                } else if (localSearchType == 3) {
+                    relocate(vehicle);
+                }
+
+                // Check if there is any improvement
+                if (vehicle.routeCost < bestCost) {
+                    bestCost = vehicle.routeCost;
+                }
+            }
+        }
+    }
+
+    solution.calculateCosts();
+    return solution;
+}
+
+    
+
 Solution Solver::findBestSolution(int n, int dmax) {
     Solution bestSolution(irp);
     double bestCost = std::numeric_limits<double>::max();
 
     for (int i = 0; i < n; ++i) {
         Solution solution = solve(dmax);
-        solution = localSearch(solution);
+        solution = localSearch(solution, 100);
+        solution = localSearchAcrossRoutes(solution, 100);
 
         double currentCost = solution.routeCost + solution.inventoryCost;
         if (currentCost < bestCost) {

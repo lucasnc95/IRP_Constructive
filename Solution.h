@@ -7,11 +7,14 @@
 
 class Route {
 public:
-    std::vector<std::pair<int, int>> route; // Vector of (customer_id, delivery_amount) pairs
+    std::vector<std::pair<int, int>> route; // <customer ID, delivered quantity>
+    int cargaTotal;
     double routeCost;
+    int remainingCapacity; // New variable to store remaining capacity
 
-    Route() : routeCost(0.0) {}
+    Route() : cargaTotal(0), routeCost(0.0), remainingCapacity(0) {}
 };
+
 
 class Solution {
 public:

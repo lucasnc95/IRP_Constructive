@@ -154,7 +154,6 @@ void Solver::twoOpt(Route& route) {
     bool improvement = true;
     while (improvement) {
         improvement = false;
-        double bestCost = route.routeCost;
 
         for (int i = 1; i < n - 2; ++i) {  // Skip the first and last element (depot)
             for (int j = i + 1; j < n - 1; ++j) {  // Skip the first and last element (depot)
@@ -171,20 +170,24 @@ void Solver::twoOpt(Route& route) {
 
                 if (costImprovement > 0) {
                     std::reverse(route.route.begin() + i, route.route.begin() + j + 1);
+                    route.routeCost -= costImprovement;
                     improvement = true;
 
-                    // Recalculate the route cost
-                    route.routeCost = calculateRouteCost(route);
-                    bestCost = route.routeCost;
+                    #ifdef DEBUG
+                    // Debug section: Recalculate and compare route costs
+                    double recalculatedCost = calculateRouteCost(route);
+                    if (std::abs(recalculatedCost - route.routeCost) > 1e-6) {
+                        std::cerr << "Discrepancy in 2-opt cost calculation: " 
+                                  << "Calculated: " << route.routeCost 
+                                  << ", Recalculated: " << recalculatedCost << std::endl;
+                    }
+                    #endif
                 }
             }
         }
-
-        if (!improvement) {
-            route.routeCost = bestCost;
-        }
     }
 }
+
 
 void Solver::swap(Route& route) {
     int n = route.route.size();
@@ -193,32 +196,42 @@ void Solver::swap(Route& route) {
     bool improvement = true;
     while (improvement) {
         improvement = false;
-        double bestCost = route.routeCost;
 
         for (int i = 1; i < n - 1; ++i) {  // Skip the first and last element (depot)
             for (int j = i + 1; j < n - 1; ++j) {  // Skip the first and last element (depot)
-                // Swap customers
-                std::swap(route.route[i], route.route[j]);
+                // Calculate cost difference if we swap route[i] and route[j]
+                double oldCost = irp.costMatrix[route.route[i - 1].first][route.route[i].first] +
+                                 irp.costMatrix[route.route[i].first][route.route[i + 1].first] +
+                                 irp.costMatrix[route.route[j - 1].first][route.route[j].first] +
+                                 irp.costMatrix[route.route[j].first][route.route[j + 1].first];
 
-                // Recalculate the route cost
-                double newCost = calculateRouteCost(route);
-                double costImprovement = route.routeCost - newCost;
+                double newCost = irp.costMatrix[route.route[i - 1].first][route.route[j].first] +
+                                 irp.costMatrix[route.route[j].first][route.route[i + 1].first] +
+                                 irp.costMatrix[route.route[j - 1].first][route.route[i].first] +
+                                 irp.costMatrix[route.route[i].first][route.route[j + 1].first];
+
+                double costImprovement = oldCost - newCost;
 
                 if (costImprovement > 0) {
-                    route.routeCost = newCost;
-                    improvement = true;
-                } else {
-                    // Swap back if no improvement
                     std::swap(route.route[i], route.route[j]);
+                    route.routeCost -= costImprovement;
+                    improvement = true;
+
+                    #ifdef DEBUG
+                    // Debug section: Recalculate and compare route costs
+                    double recalculatedCost = calculateRouteCost(route);
+                    if (std::abs(recalculatedCost - route.routeCost) > 1e-6) {
+                        std::cerr << "Discrepancy in swap cost calculation: " 
+                                  << "Calculated: " << route.routeCost 
+                                  << ", Recalculated: " << recalculatedCost << std::endl;
+                    }
+                    #endif
                 }
             }
         }
-
-        if (!improvement) {
-            route.routeCost = bestCost;
-        }
     }
 }
+
 
 void Solver::relocate(Route& route) {
     int n = route.route.size();
@@ -227,165 +240,214 @@ void Solver::relocate(Route& route) {
     bool improvement = true;
     while (improvement) {
         improvement = false;
-        double bestCost = route.routeCost;
 
         for (int i = 1; i < n - 1; ++i) {  // Skip the first and last element (depot)
-            auto customer = route.route[i];
             for (int j = 1; j < n - 1; ++j) {
                 if (i == j) continue;
 
-                // Remove and insert customer at new position
-                route.route.erase(route.route.begin() + i);
-                route.route.insert(route.route.begin() + j, customer);
+                // Calculate the cost of removing and inserting customer
+                double oldCost = irp.costMatrix[route.route[i - 1].first][route.route[i].first] +
+                                 irp.costMatrix[route.route[i].first][route.route[i + 1].first] +
+                                 irp.costMatrix[route.route[j - 1].first][route.route[j].first];
 
-                // Recalculate the route cost
-                double newCost = calculateRouteCost(route);
-                double costImprovement = route.routeCost - newCost;
+                double newCost = irp.costMatrix[route.route[i - 1].first][route.route[i + 1].first] +
+                                 irp.costMatrix[route.route[j - 1].first][route.route[i].first] +
+                                 irp.costMatrix[route.route[i].first][route.route[j].first];
+
+                double costImprovement = oldCost - newCost;
 
                 if (costImprovement > 0) {
-                    route.routeCost = newCost;
+                    auto customer = route.route[i];
+                    route.route.erase(route.route.begin() + i);
+                    route.route.insert(route.route.begin() + j, customer);
+                    route.routeCost -= costImprovement;
                     improvement = true;
-                    break;
-                } else {
-                    // Revert changes if no improvement
-                    route.route.erase(route.route.begin() + j);
-                    route.route.insert(route.route.begin() + i, customer);
+
+                    #ifdef DEBUG
+                    // Debug section: Recalculate and compare route costs
+                    double recalculatedCost = calculateRouteCost(route);
+                    if (std::abs(recalculatedCost - route.routeCost) > 1e-6) {
+                        std::cerr << "Discrepancy in relocate cost calculation: " 
+                                  << "Calculated: " << route.routeCost 
+                                  << ", Recalculated: " << recalculatedCost << std::endl;
+                    }
+                    #endif
                 }
             }
-            if (improvement) break;
-        }
-
-        if (!improvement) {
-            route.routeCost = bestCost;
         }
     }
 }
 
 void Solver::exchangeRoutes(Route& route1, Route& route2) {
-    bool improvement = false;
-    double bestImprovement = 0.0;
-    int best_i = -1, best_j = -1;
+    bool improvement = true;
+    while (improvement) {
+        improvement = false;
 
-    for (int i = 1; i < route1.route.size() - 1; ++i) {
-        for (int j = 1; j < route2.route.size() - 1; ++j) {
-            auto& customer1 = route1.route[i];
-            auto& customer2 = route2.route[j];
+        for (int i = 1; i < route1.route.size() - 1; ++i) {
+            for (int j = 1; j < route2.route.size() - 1; ++j) {
+                auto& customer1 = route1.route[i];
+                auto& customer2 = route2.route[j];
 
-            // Check if exchange is feasible
-            if (route1.remainingCapacity + customer1.second - customer2.second >= 0 &&
-                route2.remainingCapacity + customer2.second - customer1.second >= 0) {
+                // Check if exchange is feasible
+                if (route1.remainingCapacity + customer1.second - customer2.second >= 0 &&
+                    route2.remainingCapacity + customer2.second - customer1.second >= 0) {
 
-                // Calculate potential new costs
-                std::swap(customer1, customer2);
-                double newCost1 = calculateRouteCost(route1);
-                double newCost2 = calculateRouteCost(route2);
-                std::swap(customer1, customer2);
+                    // Calculate the cost of the current and swapped segments
+                    double oldCost1 = irp.costMatrix[route1.route[i - 1].first][customer1.first] +
+                                      irp.costMatrix[customer1.first][route1.route[i + 1].first];
+                    
+                    double oldCost2 = irp.costMatrix[route2.route[j - 1].first][customer2.first] +
+                                      irp.costMatrix[customer2.first][route2.route[j + 1].first];
+                    
+                    double newCost1 = irp.costMatrix[route1.route[i - 1].first][customer2.first] +
+                                      irp.costMatrix[customer2.first][route1.route[i + 1].first];
+                    
+                    double newCost2 = irp.costMatrix[route2.route[j - 1].first][customer1.first] +
+                                      irp.costMatrix[customer1.first][route2.route[j + 1].first];
 
-                double costImprovement = (route1.routeCost + route2.routeCost) - (newCost1 + newCost2);
+                    double costImprovement = (oldCost1 + oldCost2) - (newCost1 + newCost2);
 
-                if (costImprovement > bestImprovement) {
-                    bestImprovement = costImprovement;
-                    best_i = i;
-                    best_j = j;
-                    improvement = true;
+                    if (costImprovement > 0) {
+                        std::swap(route1.route[i], route2.route[j]);
+                        route1.routeCost -= costImprovement;
+                        route2.routeCost -= costImprovement;
+                        route1.remainingCapacity += route1.route[i].second - route2.route[j].second;
+                        route2.remainingCapacity += route2.route[j].second - route1.route[i].second;
+                        improvement = true;
+
+                        #ifdef DEBUG
+                        // Debug section: Recalculate and compare route costs
+                        double recalculatedCost1 = calculateRouteCost(route1);
+                        double recalculatedCost2 = calculateRouteCost(route2);
+                        if (std::abs(recalculatedCost1 - route1.routeCost) > 1e-6 || 
+                            std::abs(recalculatedCost2 - route2.routeCost) > 1e-6) {
+                            std::cerr << "Discrepancy in exchangeRoutes cost calculation: " 
+                                      << "Route 1 Calculated: " << route1.routeCost 
+                                      << ", Recalculated: " << recalculatedCost1 << std::endl;
+                            std::cerr << "Route 2 Calculated: " << route2.routeCost 
+                                      << ", Recalculated: " << recalculatedCost2 << std::endl;
+                        }
+                        #endif
+                    }
                 }
             }
         }
-    }
-
-    if (improvement) {
-        // Apply the best exchange found
-        std::swap(route1.route[best_i], route2.route[best_j]);
-        route1.routeCost = calculateRouteCost(route1);
-        route2.routeCost = calculateRouteCost(route2);
-        route1.remainingCapacity += route1.route[best_i].second - route2.route[best_j].second;
-        route2.remainingCapacity += route2.route[best_j].second - route1.route[best_i].second;
     }
 }
 
 void Solver::relocateRoutes(Route& route1, Route& route2) {
-    bool improvement = false;
-    double bestImprovement = 0.0;
-    int best_i = -1, best_j = -1;
+    bool improvement = true;
+    while (improvement) {
+        improvement = false;
 
-    for (int i = 1; i < route1.route.size() - 1; ++i) {
-        auto customer = route1.route[i];
+        for (int i = 1; i < route1.route.size() - 1; ++i) {
+            auto customer = route1.route[i];
 
-        for (int j = 1; j < route2.route.size(); ++j) {
-            if (route2.remainingCapacity >= customer.second) {
-                // Calculate potential new costs
-                route1.route.erase(route1.route.begin() + i);
-                route2.route.insert(route2.route.begin() + j, customer);
-                double newCost1 = calculateRouteCost(route1);
-                double newCost2 = calculateRouteCost(route2);
-                route2.route.erase(route2.route.begin() + j);
-                route1.route.insert(route1.route.begin() + i, customer);
+            for (int j = 1; j < route2.route.size(); ++j) {
+                if (route2.remainingCapacity >= customer.second) {
+                    // Calculate the cost of removing from route1 and inserting into route2
+                    double oldCost1 = irp.costMatrix[route1.route[i - 1].first][customer.first] +
+                                      irp.costMatrix[customer.first][route1.route[i + 1].first];
+                    
+                    double newCost1 = irp.costMatrix[route1.route[i - 1].first][route1.route[i + 1].first];
+                    
+                    double oldCost2 = irp.costMatrix[route2.route[j - 1].first][route2.route[j].first];
+                    
+                    double newCost2 = irp.costMatrix[route2.route[j - 1].first][customer.first] +
+                                      irp.costMatrix[customer.first][route2.route[j].first];
 
-                double costImprovement = (route1.routeCost + route2.routeCost) - (newCost1 + newCost2);
+                    double costImprovement = (oldCost1 + oldCost2) - (newCost1 + newCost2);
 
-                if (costImprovement > bestImprovement) {
-                    bestImprovement = costImprovement;
-                    best_i = i;
-                    best_j = j;
-                    improvement = true;
+                    if (costImprovement > 0) {
+                        route1.route.erase(route1.route.begin() + i);
+                        route2.route.insert(route2.route.begin() + j, customer);
+                        route1.routeCost -= costImprovement;
+                        route2.routeCost -= costImprovement;
+                        route1.remainingCapacity += customer.second;
+                        route2.remainingCapacity -= customer.second;
+                        improvement = true;
+
+                        #ifdef DEBUG
+                        // Debug section: Recalculate and compare route costs
+                        double recalculatedCost1 = calculateRouteCost(route1);
+                        double recalculatedCost2 = calculateRouteCost(route2);
+                        if (std::abs(recalculatedCost1 - route1.routeCost) > 1e-6 || 
+                            std::abs(recalculatedCost2 - route2.routeCost) > 1e-6) {
+                            std::cerr << "Discrepancy in relocateRoutes cost calculation: " 
+                                      << "Route 1 Calculated: " << route1.routeCost 
+                                      << ", Recalculated: " << recalculatedCost1 << std::endl;
+                            std::cerr << "Route 2 Calculated: " << route2.routeCost 
+                                      << ", Recalculated: " << recalculatedCost2 << std::endl;
+                        }
+                        #endif
+                    }
                 }
             }
         }
     }
-
-    if (improvement) {
-        // Apply the best relocation found
-        auto customer = route1.route[best_i];
-        route1.route.erase(route1.route.begin() + best_i);
-        route2.route.insert(route2.route.begin() + best_j, customer);
-        route1.routeCost = calculateRouteCost(route1);
-        route2.routeCost = calculateRouteCost(route2);
-        route1.remainingCapacity += customer.second;
-        route2.remainingCapacity -= customer.second;
-    }
 }
+
 
 void Solver::swapRoutes(Route& route1, Route& route2) {
-    bool improvement = false;
-    double bestImprovement = 0.0;
-    int best_i = -1, best_j = -1;
+    bool improvement = true;
+    while (improvement) {
+        improvement = false;
 
-    for (int i = 1; i < route1.route.size() - 1; ++i) {
-        for (int j = 1; j < route2.route.size() - 1; ++j) {
-            auto& customer1 = route1.route[i];
-            auto& customer2 = route2.route[j];
+        for (int i = 1; i < route1.route.size() - 1; ++i) {
+            for (int j = 1; j < route2.route.size() - 1; ++j) {
+                auto& customer1 = route1.route[i];
+                auto& customer2 = route2.route[j];
 
-            // Check if swap is feasible
-            if (route1.remainingCapacity + customer1.second - customer2.second >= 0 &&
-                route2.remainingCapacity + customer2.second - customer1.second >= 0) {
+                // Check if swap is feasible
+                if (route1.remainingCapacity + customer1.second - customer2.second >= 0 &&
+                    route2.remainingCapacity + customer2.second - customer1.second >= 0) {
 
-                // Calculate potential new costs
-                std::swap(customer1, customer2);
-                double newCost1 = calculateRouteCost(route1);
-                double newCost2 = calculateRouteCost(route2);
-                std::swap(customer1, customer2);
+                    // Calculate the cost of the current and swapped segments
+                    double oldCost1 = irp.costMatrix[route1.route[i - 1].first][customer1.first] +
+                                      irp.costMatrix[customer1.first][route1.route[i + 1].first];
+                    
+                    double oldCost2 = irp.costMatrix[route2.route[j - 1].first][customer2.first] +
+                                      irp.costMatrix[customer2.first][route2.route[j + 1].first];
+                    
+                    double newCost1 = irp.costMatrix[route1.route[i - 1].first][customer2.first] +
+                                      irp.costMatrix[customer2.first][route1.route[i + 1].first];
+                    
+                    double newCost2 = irp.costMatrix[route2.route[j - 1].first][customer1.first] +
+                                      irp.costMatrix[customer1.first][route2.route[j + 1].first];
 
-                double costImprovement = (route1.routeCost + route2.routeCost) - (newCost1 + newCost2);
+                    double costImprovement = (oldCost1 + oldCost2) - (newCost1 + newCost2);
 
-                if (costImprovement > bestImprovement) {
-                    bestImprovement = costImprovement;
-                    best_i = i;
-                    best_j = j;
-                    improvement = true;
+                    if (costImprovement > 0) {
+                        std::swap(route1.route[i], route2.route[j]);
+                        route1.routeCost -= costImprovement;
+                        route2.routeCost -= costImprovement;
+                        route1.remainingCapacity += customer1.second - customer2.second;
+                        route2.remainingCapacity += customer2.second - customer1.second;
+                        improvement = true;
+
+                        #ifdef DEBUG
+                        // Debug section: Recalculate and compare route costs
+                        double recalculatedCost1 = calculateRouteCost(route1);
+                        double recalculatedCost2 = calculateRouteCost(route2);
+                        if (std::abs(recalculatedCost1 - route1.routeCost) > 1e-6 || 
+                            std::abs(recalculatedCost2 - route2.routeCost) > 1e-6) {
+                            std::cerr << "Discrepancy in swapRoutes cost calculation: " 
+                                      << "Route 1 Calculated: " << route1.routeCost 
+                                      << ", Recalculated: " << recalculatedCost1 << std::endl;
+                            std::cerr << "Route 2 Calculated: " << route2.routeCost 
+                                      << ", Recalculated: " << recalculatedCost2 << std::endl;
+                        }
+                        #endif
+                    }
                 }
             }
         }
     }
-
-    if (improvement) {
-        // Apply the best swap found
-        std::swap(route1.route[best_i], route2.route[best_j]);
-        route1.routeCost = calculateRouteCost(route1);
-        route2.routeCost = calculateRouteCost(route2);
-        route1.remainingCapacity += route1.route[best_i].second - route2.route[best_j].second;
-        route2.remainingCapacity += route2.route[best_j].second - route1.route[best_i].second;
-    }
 }
+
+
+
+
 
 Solution Solver::localSearchAcrossRoutes(Solution& solution, int iterations) {
     std::random_device rd;
@@ -455,7 +517,7 @@ Solution Solver::findBestSolution(int n, int dmax) {
 
     for (int i = 0; i < n; ++i) {
         Solution solution = solve(dmax);
-        solution = localSearch(solution, 100);
+       // solution = localSearch(solution, 100);
         solution = localSearchAcrossRoutes(solution, 100);
 
         double currentCost = solution.routeCost + solution.inventoryCost;

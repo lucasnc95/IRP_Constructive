@@ -12,7 +12,17 @@ public:
     double routeCost;
     int remainingCapacity; // New variable to store remaining capacity
 
+    void printRoute() const {
+        std::cout << "Route details:" << std::endl;
+        for (const auto& stop : route) {
+            std::cout << "(ID " << stop.first << ",  " << stop.second << ") ";
+        }
+       std::cout<<std::endl;
+    }
+
     Route() : cargaTotal(0), routeCost(0.0), remainingCapacity(0) {}
+    void addDelivery(int customerId, int quantity);
+    void removeDelivery(int customerId, int quantity);
 };
 
 
@@ -23,7 +33,8 @@ public:
     std::vector<std::vector<int>> currentInventory;
     double routeCost;
     double inventoryCost;
-
+    double bestAlpha = -1.0;
+    int bestDmax = -1;
     Solution(const IRP& irp);
     Solution(const Solution& other);
     Solution& operator=(const Solution& other);
@@ -35,3 +46,4 @@ public:
 };
 
 #endif // SOLUTION_H
+

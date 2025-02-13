@@ -157,3 +157,14 @@ void Route::removeDelivery(int customerId, int quantity) {
 
   //  std::cerr << "Erro: Cliente " << customerId << " não encontrado na rota." << std::endl;
 }
+
+
+double Solution::getTotalCost(){
+
+
+calculateCosts();
+
+
+return routeCost + inventoryCost;
+
+}

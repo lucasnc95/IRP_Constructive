@@ -43,6 +43,8 @@ public:
     bool isFeasible() const;
     void printSolution() const;
     void printInventoryLevels(int period) const;
+    double getTotalCost();
+    
 };
 
 #endif // SOLUTION_H

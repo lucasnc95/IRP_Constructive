@@ -72,7 +72,13 @@ int main(int argc, char* argv[]) {
     // Salva os resultados no arquivo .csv
     double bestAlpha = bestSolution.bestAlpha; 
     int bestD = bestSolution.bestDmax;
-    bestSolution.printSolution();
+    //bestSolution.printSolution();
+    if(bestSolution.isFeasible())
+    {
+      std::cout << "Solução válida "<< std::endl;
+    }
+    else
+    std::cout << "Solução inválida "<< std::endl;
     saveResultsToCSV(instanceName, bestD, bestAlpha, totalRouteCost, totalInventoryCost, totalCost, elapsedSeconds.count(), seed, argv[0]);
 
     return 0;

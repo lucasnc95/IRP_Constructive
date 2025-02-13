@@ -33,7 +33,7 @@ public:
     int Vehicle_Type, Fleet_Size, Capacity;
     std::vector<Depot> depots;
     std::vector<Customer> customers;
-    std::vector<std::vector<int>> costMatrix; // 2D cost matrix
+    std::vector<std::vector<double>> costMatrix; // 2D cost matrix
 
     void readDataFromFile(const std::string& filename);
 };

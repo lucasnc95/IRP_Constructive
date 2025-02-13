@@ -11,13 +11,13 @@ void IRP::readDataFromFile(const std::string& filename) {
     std::string aux;
     file >> aux >> nVehicles >> aux >> nDepots >> aux >> nCustomers >> aux >> nPeriods;
 
-    getline(file, line); // Skip line
-    getline(file, line); // Skip line
+    getline(file, line); 
+    getline(file, line); 
     file >> Vehicle_Type >> Fleet_Size >> Capacity;
-    getline(file, line); // Skip line
-    getline(file, line); // Skip line
+    getline(file, line); 
+    getline(file, line); 
 
-    // Read depot data
+    
     for (int i = 0; i < nDepots; ++i) {
         Depot depot;
         file >> depot.id >> depot.x >> depot.y >> depot.invCost >> depot.initialInv >> depot.minLevelInv >> depot.maxLevelInv;
@@ -27,10 +27,10 @@ void IRP::readDataFromFile(const std::string& filename) {
         depots.push_back(depot);
     }
 
-    getline(file, line); // Skip line
-    getline(file, line); // Skip line
+    getline(file, line); 
+    getline(file, line); 
 
-    // Read customer data
+    
     for (int i = 0; i < nCustomers; ++i) {
         Customer customer;
         file >> customer.id >> customer.x >> customer.y >> customer.invCost >> customer.initialInv >> customer.minLevelInv >> customer.maxLevelInv;
@@ -41,14 +41,14 @@ void IRP::readDataFromFile(const std::string& filename) {
         customers.push_back(customer);
     }
 
-    getline(file, line); // Skip line
-    getline(file, line); // Skip line
-    getline(file, line); // Skip line
-    getline(file, line); // Skip line
+    getline(file, line); 
+    getline(file, line); 
+    getline(file, line); 
+    getline(file, line); 
 
-    // Read cost matrix
+    
     int matrixSize = nDepots + nCustomers;
-   costMatrix.resize(nDepots + nCustomers , std::vector<int>(nDepots + nCustomers , 0));
+   costMatrix.resize(nDepots + nCustomers , std::vector<double>(nDepots + nCustomers , 0));
         int contAux = 0;
         for (int i = 0; i < nDepots + nCustomers ; i++) {
             if (i > 0)

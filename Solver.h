@@ -35,6 +35,8 @@ public:
     bool supplyRemoval(Solution& solution, int period, int customerId, int quantity);
     bool shiftDelivery(Solution& solution, int periodFrom, int periodTo, int customerId);
     bool localSearchInventory(Solution& solution);
+    bool validateSolution(Solution& solution);
+    bool validateInventory(Solution& solution);
 
 
 private:

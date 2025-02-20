@@ -41,9 +41,19 @@ Solution Solver::solve(int dmax, float alpha) {
 
     Solution bestSolution(irp);
     for (int t = 0; t < irp.nPeriods; ++t) {
-        Solution periodSolution = buildRoutes(t, dmax, currentInventory, alpha);
+    ;
+        
+       Solution periodSolution = buildRoutesEnhanced(t, dmax, currentInventory, alpha);
+        
+        //Solution periodSolution2 = buildRoutes(t, dmax, currentInventory, alpha);
+      //  if (t%2 == 0){
         bestSolution.vehicleRoutes[t] = periodSolution.vehicleRoutes[t];
         bestSolution.currentInventory = periodSolution.currentInventory;
+      //}  else {
+        // bestSolution.vehicleRoutes[t] = periodSolution2.vehicleRoutes[t];
+       //  bestSolution.currentInventory = periodSolution2.currentInventory;
+        
+        //}
     }
 
     bestSolution.calculateCosts();
@@ -217,135 +227,239 @@ void Solver::twoOpt(Route& route) { // correto
 
 
 
-void Solver::exchangeOneOne(Route& route) { //exchange 11 implementar 21 22
-    int n = route.route.size();
-    if (n <= 2) return;
+// void Solver::exchangeOneOne(Route& route) { //exchange 11 implementar 21 22
+//     int n = route.route.size();
+//     if (n <= 2) return;
 
-    bool improvement = true;
-    while (improvement) {
-        improvement = false;
+//     bool improvement = true;
+//     while (improvement) {
+//         improvement = false;
 
-        for (int i = 1; i < n - 1; ++i) {
-            for (int j = i + 1; j < n - 1; ++j) {
+//         for (int i = 1; i < n - 1; ++i) {
+//             for (int j = i + 1; j < n - 1; ++j) {
                 
-                double oldCost1 = irp.costMatrix[route.route[i - 1].first][route.route[i].first] +
-                                  irp.costMatrix[route.route[i].first][route.route[i + 1].first];
-                double oldCost2 = irp.costMatrix[route.route[j - 1].first][route.route[j].first] +
-                                  irp.costMatrix[route.route[j].first][route.route[j + 1].first];
+//                 double oldCost1 = irp.costMatrix[route.route[i - 1].first][route.route[i].first] +
+//                                   irp.costMatrix[route.route[i].first][route.route[i + 1].first];
+//                 double oldCost2 = irp.costMatrix[route.route[j - 1].first][route.route[j].first] +
+//                                   irp.costMatrix[route.route[j].first][route.route[j + 1].first];
 
-                if (j == i + 1) {
-                    oldCost1 = irp.costMatrix[route.route[i - 1].first][route.route[i].first] +
-                               irp.costMatrix[route.route[i].first][route.route[j].first] +
-                               irp.costMatrix[route.route[j].first][route.route[j + 1].first];
-                    oldCost2 = 0;
-                }
+//                 if (j == i + 1) {
+//                     oldCost1 = irp.costMatrix[route.route[i - 1].first][route.route[i].first] +
+//                                irp.costMatrix[route.route[i].first][route.route[j].first] +
+//                                irp.costMatrix[route.route[j].first][route.route[j + 1].first];
+//                     oldCost2 = 0;
+//                 }
 
-                double newCost1 = irp.costMatrix[route.route[i - 1].first][route.route[j].first] +
-                                  irp.costMatrix[route.route[j].first][route.route[i + 1].first];
-                double newCost2 = irp.costMatrix[route.route[j - 1].first][route.route[i].first] +
-                                  irp.costMatrix[route.route[i].first][route.route[j + 1].first];
+//                 double newCost1 = irp.costMatrix[route.route[i - 1].first][route.route[j].first] +
+//                                   irp.costMatrix[route.route[j].first][route.route[i + 1].first];
+//                 double newCost2 = irp.costMatrix[route.route[j - 1].first][route.route[i].first] +
+//                                   irp.costMatrix[route.route[i].first][route.route[j + 1].first];
 
-                if (j == i + 1) {
-                    newCost1 = irp.costMatrix[route.route[i - 1].first][route.route[j].first] +
-                               irp.costMatrix[route.route[j].first][route.route[i].first] +
-                               irp.costMatrix[route.route[i].first][route.route[j + 1].first];
-                    newCost2 = 0;
-                }
+//                 if (j == i + 1) {
+//                     newCost1 = irp.costMatrix[route.route[i - 1].first][route.route[j].first] +
+//                                irp.costMatrix[route.route[j].first][route.route[i].first] +
+//                                irp.costMatrix[route.route[i].first][route.route[j + 1].first];
+//                     newCost2 = 0;
+//                 }
 
-                double costImprovement = (oldCost1 + oldCost2) - (newCost1 + newCost2);
+//                 double costImprovement = (oldCost1 + oldCost2) - (newCost1 + newCost2);
 
-                if (costImprovement > 0) {
-                    #ifdef DEBUG
-                    std::cout << "exchangeOneOne - Route before modification:" << std::endl;
-                    route.printRoute();
-                    std::cout << "Route Cost: " << route.routeCost << std::endl;
-                    #endif
+//                 if (costImprovement > 0) {
+//                     #ifdef DEBUG
+//                     std::cout << "exchangeOneOne - Route before modification:" << std::endl;
+//                     route.printRoute();
+//                     std::cout << "Route Cost: " << route.routeCost << std::endl;
+//                     #endif
 
-                    std::swap(route.route[i], route.route[j]);
-                    route.routeCost -= costImprovement;
-                    improvement = true;
+//                     std::swap(route.route[i], route.route[j]);
+//                     route.routeCost -= costImprovement;
+//                     improvement = true;
 
-                    #ifdef DEBUG
-                    std::cout << "exchangeOneOne - Route after modification:" << std::endl;
-                    route.printRoute();
-                    std::cout << "Route Cost: " << route.routeCost << std::endl;
-                    double recalculatedCost = calculateRouteCost(route);
-                    if (std::abs(recalculatedCost - route.routeCost) > 1e-6) {
-                        std::cerr << "Discrepancy in exchangeOneOne cost calculation: Calculated: "
-                                  << route.routeCost << ", Recalculated: " << recalculatedCost << std::endl;
-                    exit(0);
-                    }
-                    #endif
-                    break;
-                }
-            }
+//                     #ifdef DEBUG
+//                     std::cout << "exchangeOneOne - Route after modification:" << std::endl;
+//                     route.printRoute();
+//                     std::cout << "Route Cost: " << route.routeCost << std::endl;
+//                     double recalculatedCost = calculateRouteCost(route);
+//                     if (std::abs(recalculatedCost - route.routeCost) > 1e-6) {
+//                         std::cerr << "Discrepancy in exchangeOneOne cost calculation: Calculated: "
+//                                   << route.routeCost << ", Recalculated: " << recalculatedCost << std::endl;
+//                     exit(0);
+//                     }
+//                     #endif
+//                     break;
+//                 }
+//             }
 
-            if (improvement) break;
-        }
-    }
-}
+//             if (improvement) break;
+//         }
+//     }
+// }
 
-void Solver::exchangeTwoTwo(Route& route) { // ok
+
+
+
+
+
+
+void Solver::exchangeOneOne(Route& route) {
     int n = route.route.size();
-    if (n <= 3) return; // Ensure there are at least two pairs of customers to swap
+    if (n <= 3) return; // Precisa ter pelo menos 2 clientes + depósitos
 
     bool improvement = true;
     while (improvement) {
         improvement = false;
 
-        for (int i = 1; i < n - 2; ++i) { 
-            for (int j = i + 2; j < n - 2; ++j) { // Avoid overlapping pairs
-                // Define two pairs of consecutive customers
-                auto customer1 = route.route[i];
-                auto customer2 = route.route[i + 1];
-                auto customer3 = route.route[j];
-                auto customer4 = route.route[j + 1];
+        for (int i = 1; i < n - 2; ++i) {
+            for (int j = i + 1; j < n - 1; ++j) {
+                // Cálculo do custo antes da troca
+                double oldCost = 0.0;
+                if (i > 1) oldCost += irp.costMatrix[route.route[i-1].first][route.route[i].first];
+                oldCost += irp.costMatrix[route.route[i].first][route.route[i+1].first];
+                
+                if (j > i + 1) oldCost += irp.costMatrix[route.route[j-1].first][route.route[j].first];
+                oldCost += irp.costMatrix[route.route[j].first][route.route[j+1].first];
 
-                // Calculate current cost for both pairs
-                double oldCost1 = irp.costMatrix[route.route[i - 1].first][customer1.first] +
-                                  irp.costMatrix[customer2.first][route.route[i + 2].first];
-                double oldCost2 = irp.costMatrix[route.route[j - 1].first][customer3.first] +
-                                  irp.costMatrix[customer4.first][route.route[j + 2].first];
+                // Cálculo do custo após a troca
+                double newCost = 0.0;
+                if (i > 1) newCost += irp.costMatrix[route.route[i-1].first][route.route[j].first];
+                newCost += irp.costMatrix[route.route[j].first][route.route[i+1].first];
+                
+                if (j > i + 1) newCost += irp.costMatrix[route.route[j-1].first][route.route[i].first];
+                newCost += irp.costMatrix[route.route[i].first][route.route[j+1].first];
 
-                // Calculate the cost if swapped
-                double newCost1 = irp.costMatrix[route.route[i - 1].first][customer3.first] +
-                                  irp.costMatrix[customer4.first][route.route[i + 2].first];
-                double newCost2 = irp.costMatrix[route.route[j - 1].first][customer1.first] +
-                                  irp.costMatrix[customer2.first][route.route[j + 2].first];
-
-                double costImprovement = (oldCost1 + oldCost2) - (newCost1 + newCost2);
-
-                if (costImprovement > 0) {
-                    #ifdef DEBUG
-                    std::cout << "exchangeTwoTwo - Route before modification:" << std::endl;
-                    route.printRoute();
-                    std::cout << "Route Cost: " << route.routeCost << std::endl;
-                    #endif
-
-                    // Swap pairs
+                // Verifica melhoria
+                if ((oldCost - newCost) > 1e-6) {
                     std::swap(route.route[i], route.route[j]);
-                    std::swap(route.route[i + 1], route.route[j + 1]);
-                    route.routeCost -= costImprovement;
+                    route.routeCost += (newCost - oldCost);
                     improvement = true;
 
                     #ifdef DEBUG
-                    std::cout << "exchangeTwoTwo - Route after modification:" << std::endl;
-                    route.printRoute();
-                    std::cout << "Route Cost: " << route.routeCost << std::endl;
-                    double recalculatedCost = calculateRouteCost(route);
-                    if (std::abs(recalculatedCost - route.routeCost) > 1e-6) {
-                        std::cerr << "Discrepancy in exchangeTwoTwo cost calculation: Calculated: "
-                                  << route.routeCost << ", Recalculated: " << recalculatedCost << std::endl;
-                    exit(0);
-                    }
+                    verifyCapacity(route); // Capacidade não muda, mas valida consistência
                     #endif
-                    break;
                 }
             }
-            if (improvement) break;
         }
     }
 }
+
+
+
+
+
+
+
+// void Solver::exchangeTwoTwo(Route& route) { // ok
+//     int n = route.route.size();
+//     if (n <= 3) return; // Ensure there are at least two pairs of customers to swap
+
+//     bool improvement = true;
+//     while (improvement) {
+//         improvement = false;
+
+//         for (int i = 1; i < n - 2; ++i) { 
+//             for (int j = i + 2; j < n - 2; ++j) { // Avoid overlapping pairs
+//                 // Define two pairs of consecutive customers
+//                 auto customer1 = route.route[i];
+//                 auto customer2 = route.route[i + 1];
+//                 auto customer3 = route.route[j];
+//                 auto customer4 = route.route[j + 1];
+
+//                 // Calculate current cost for both pairs
+//                 double oldCost1 = irp.costMatrix[route.route[i - 1].first][customer1.first] +
+//                                   irp.costMatrix[customer2.first][route.route[i + 2].first];
+//                 double oldCost2 = irp.costMatrix[route.route[j - 1].first][customer3.first] +
+//                                   irp.costMatrix[customer4.first][route.route[j + 2].first];
+
+//                 // Calculate the cost if swapped
+//                 double newCost1 = irp.costMatrix[route.route[i - 1].first][customer3.first] +
+//                                   irp.costMatrix[customer4.first][route.route[i + 2].first];
+//                 double newCost2 = irp.costMatrix[route.route[j - 1].first][customer1.first] +
+//                                   irp.costMatrix[customer2.first][route.route[j + 2].first];
+
+//                 double costImprovement = (oldCost1 + oldCost2) - (newCost1 + newCost2);
+
+//                 if (costImprovement > 0) {
+//                     #ifdef DEBUG
+//                     std::cout << "exchangeTwoTwo - Route before modification:" << std::endl;
+//                     route.printRoute();
+//                     std::cout << "Route Cost: " << route.routeCost << std::endl;
+//                     #endif
+
+//                     // Swap pairs
+//                     std::swap(route.route[i], route.route[j]);
+//                     std::swap(route.route[i + 1], route.route[j + 1]);
+//                     route.routeCost -= costImprovement;
+//                     improvement = true;
+
+//                     #ifdef DEBUG
+//                     std::cout << "exchangeTwoTwo - Route after modification:" << std::endl;
+//                     route.printRoute();
+//                     std::cout << "Route Cost: " << route.routeCost << std::endl;
+//                     double recalculatedCost = calculateRouteCost(route);
+//                     if (std::abs(recalculatedCost - route.routeCost) > 1e-6) {
+//                         std::cerr << "Discrepancy in exchangeTwoTwo cost calculation: Calculated: "
+//                                   << route.routeCost << ", Recalculated: " << recalculatedCost << std::endl;
+//                     exit(0);
+//                     }
+//                     #endif
+//                     break;
+//                 }
+//             }
+//             if (improvement) break;
+//         }
+//     }
+// }
+
+
+
+
+
+void Solver::exchangeTwoTwo(Route& route) {
+    int n = route.route.size();
+    if (n <= 5) return; // Precisa de espaço para dois pares + depósitos
+
+    bool improvement = true;
+    while (improvement) {
+        improvement = false;
+
+        for (int i = 1; i < n - 3; ++i) {
+            for (int j = i + 2; j < n - 3; ++j) {
+                // Cálculo de custo original
+                double oldCost = 
+                    irp.costMatrix[route.route[i-1].first][route.route[i].first] +
+                    irp.costMatrix[route.route[i+1].first][route.route[i+2].first] +
+                    irp.costMatrix[route.route[j-1].first][route.route[j].first] +
+                    irp.costMatrix[route.route[j+1].first][route.route[j+2].first];
+
+                // Cálculo de custo após troca
+                double newCost = 
+                    irp.costMatrix[route.route[i-1].first][route.route[j].first] +
+                    irp.costMatrix[route.route[j+1].first][route.route[i+2].first] +
+                    irp.costMatrix[route.route[j-1].first][route.route[i].first] +
+                    irp.costMatrix[route.route[i+1].first][route.route[j+2].first];
+
+                if ((oldCost - newCost) > 1e-6) {
+                    // Troca os pares
+                    std::swap(route.route[i], route.route[j]);
+                    std::swap(route.route[i+1], route.route[j+1]);
+                    route.routeCost += (newCost - oldCost);
+                    improvement = true;
+                }
+            }
+        }
+    }
+
+
+                    #ifdef DEBUG
+                    verifyCapacity(route); // Capacidade não muda, mas valida consistência
+                    #endif
+
+
+}
+
+
+
+
 
 void Solver::exchangeTwoOne(Route& route) { 
     int n = route.route.size();
@@ -984,6 +1098,12 @@ Solution Solver::findBestSolution(int n, int maxDmax,unsigned seed, int maxNoImp
         for (float alpha : alphaValues) {
             // Gera uma solução inicial com os valores atuais de dmax e alpha
             Solution solution = solve(dmax, alpha);
+            // if(solution.isFeasible())
+            // std::cout<<"Solução válida"<<std::endl;
+            // else{
+            // std::cout<<"Solução inválida"<<std::endl;
+            // break;
+            // }
             solution = localSearchRandomized(solution, maxNoImp, seed);
 
             double currentCost = solution.routeCost + solution.inventoryCost;
@@ -996,11 +1116,11 @@ Solution Solver::findBestSolution(int n, int maxDmax,unsigned seed, int maxNoImp
                 bestAlpha = alpha; // Atualiza o melhor alpha
 
                 // Mensagem de debug opcional
-              //  #ifdef DEBUG
+                #ifdef DEBUG
                 std::cout << "Melhoria encontrada! Custo: " << currentCost
                           << ", dmax: " << dmax
                           << ", alpha: " << alpha << std::endl;
-                //#endif
+                #endif
             }
         }
     }
@@ -1112,10 +1232,10 @@ void Solver::executeLocalSearch(int searchIndex, Solution& solution) {
                             j = 0;
                         }
                     }
-                } else {
+                } //else {
                     // Busca local de inventário
-                    improvement |= localSearchInventory(solution);
-                }
+                    // improvement |= localSearchInventory(solution);
+                //}
             }
         }
     }
@@ -1154,7 +1274,10 @@ Solution Solver::localSearchRandomized(Solution& solution, int maxNoImprovement,
             ++noImprovementCount;
         }
     }
-
+    if(solution.isFeasible())
+    std::cout<<"Solução válida na busca local"<<std::endl;
+    else
+    std::cout<<"Solução inválida na busca local"<<std::endl;
     return solution;
 }
 
@@ -1493,4 +1616,367 @@ bool Solver::validateInventory(Solution& solution) {
         }
     }
     return true;
+}
+
+
+
+// Solution Solver::buildRoutesEnhanced(int period, int dmax, std::vector<std::vector<int>>& currentInventory, float alpha) {
+//     Solution solution(irp);
+//     solution.currentInventory = currentInventory;
+
+//     // Inicialização de veículos
+//     std::vector<Vehicle> vehicles;
+//     for (int i = 0; i < irp.Fleet_Size; ++i) {
+//         vehicles.emplace_back(i, irp.Capacity, irp.depots[0].id);
+//         solution.vehicleRoutes[period].emplace_back();
+//         solution.vehicleRoutes[period][i].route.push_back({irp.depots[0].id, 0});
+//     }
+
+//     // Estratégias de construção aleatórias
+//     enum ConstructionStrategy { 
+//         NEAREST_NEIGHBOR, 
+//         FARTHEST_INSERTION, 
+//         CHEAPEST_INSERTION, 
+//         RANDOM_INSERTION 
+//     };
+    
+//     std::uniform_int_distribution<int> strategyDist(0, 3);
+//     ConstructionStrategy strategy = static_cast<ConstructionStrategy>(strategyDist(rng));
+
+//     // Geração da lista de candidatos com múltiplos critérios
+//     std::vector<std::pair<int, double>> candidateScores;
+//     for (int i = 1; i <= irp.nCustomers; ++i) {
+//         double score = 0.0;
+//         const Customer& cust = irp.customers[i-1];
+        
+//         // Critério 1: Urgência de demanda
+//         double demandUrgency = 1.0 - (currentInventory[i][period] / static_cast<double>(cust.maxLevelInv));
+        
+//         // Critério 2: Distância do depósito
+//         double depotDistance = irp.costMatrix[0][i];
+        
+//         // Critério 3: Variação aleatória
+//         double randomFactor = static_cast<double>(rand()) / RAND_MAX;
+        
+//         // Combinação ponderada
+//         score = (0.4 * demandUrgency) + (0.3 * (1.0/depotDistance)) + (0.3 * randomFactor);
+        
+//         candidateScores.emplace_back(i, score);
+//     }
+
+//     // Ordenação adaptativa baseada na estratégia
+//     switch(strategy) {
+//         case FARTHEST_INSERTION:
+//             std::sort(candidateScores.begin(), candidateScores.end(), 
+//                      [](const auto& a, const auto& b) { return a.second > b.second; });
+//             break;
+//         case CHEAPEST_INSERTION:
+//             std::sort(candidateScores.begin(), candidateScores.end(), 
+//                      [this](const auto& a, const auto& b) {
+//                          return irp.costMatrix[0][a.first] < irp.costMatrix[0][b.first];
+//                      });
+//             break;
+//         default:
+//             std::shuffle(candidateScores.begin(), candidateScores.end(), rng);
+//     }
+
+//     // Construção adaptativa das rotas
+//     for (const auto& [customerId, score] : candidateScores) {
+//         if (customerId < 1 || customerId > irp.nCustomers) continue;
+        
+//         // Cálculo da demanda
+//         int baseDemand = irp.customers[customerId-1].demand[period];
+//         int maxDelivery = irp.customers[customerId-1].maxLevelInv - currentInventory[customerId][period] + baseDemand;
+//         if (maxDelivery <= 0) continue;
+
+//         // Seleção de veículo com estratégia variável
+//         int selectedVehicle = -1;
+//         switch(strategy) {
+//             case NEAREST_NEIGHBOR: {
+//                 double minDist = std::numeric_limits<double>::max();
+//                 for (int i = 0; i < vehicles.size(); ++i) {
+//                     if (vehicles[i].currentCapacity >= baseDemand) {
+//                         double dist = irp.costMatrix[vehicles[i].currentLocation][customerId];
+//                         if (dist < minDist) {
+//                             minDist = dist;
+//                             selectedVehicle = i;
+//                         }
+//                     }
+//                 }
+//                 break;
+//             }
+//             case RANDOM_INSERTION: {
+//                 std::vector<int> feasibleVehicles;
+//                 for (int i = 0; i < vehicles.size(); ++i) {
+//                     if (vehicles[i].currentCapacity >= baseDemand) {
+//                         feasibleVehicles.push_back(i);
+//                     }
+//                 }
+//                 if (!feasibleVehicles.empty()) {
+//                     std::uniform_int_distribution<int> vehDist(0, feasibleVehicles.size()-1);
+//                     selectedVehicle = feasibleVehicles[vehDist(rng)];
+//                 }
+//                 break;
+//             }
+//             default: {
+//                 // Cheapest insertion
+//                 double bestCost = std::numeric_limits<double>::max();
+//                 for (int i = 0; i < vehicles.size(); ++i) {
+//                     if (vehicles[i].currentCapacity >= baseDemand) {
+//                         for (size_t pos = 1; pos < solution.vehicleRoutes[period][i].route.size(); ++pos) {
+//                             int prev = solution.vehicleRoutes[period][i].route[pos-1].first;
+//                             int next = solution.vehicleRoutes[period][i].route[pos].first;
+//                             double insertionCost = irp.costMatrix[prev][customerId] 
+//                                                  + irp.costMatrix[customerId][next]
+//                                                  - irp.costMatrix[prev][next];
+//                             if (insertionCost < bestCost) {
+//                                 bestCost = insertionCost;
+//                                 selectedVehicle = i;
+//                             }
+//                         }
+//                     }
+//                 }
+//             }
+//         }
+
+//         if (selectedVehicle == -1) continue;
+
+//         // Determinação da quantidade a entregar
+//         std::uniform_int_distribution<int> deliveryDist(baseDemand, maxDelivery);
+//         int deliveryAmount = deliveryDist(rng);
+//         deliveryAmount = std::min(deliveryAmount, vehicles[selectedVehicle].currentCapacity);
+
+//         // Inserção na rota
+//         auto& route = solution.vehicleRoutes[period][selectedVehicle];
+//         size_t insertPos = 1;
+        
+//         if (strategy == CHEAPEST_INSERTION || strategy == RANDOM_INSERTION) {
+//             // Encontra melhor posição de inserção
+//             double minCost = std::numeric_limits<double>::max();
+//             for (size_t pos = 1; pos < route.route.size(); ++pos) {
+//                 int prev = route.route[pos-1].first;
+//                 int next = route.route[pos].first;
+//                 double insertionCost = irp.costMatrix[prev][customerId] 
+//                                      + irp.costMatrix[customerId][next]
+//                                      - irp.costMatrix[prev][next];
+//                 if (insertionCost < minCost) {
+//                     minCost = insertionCost;
+//                     insertPos = pos;
+//                 }
+//             }
+//         } else {
+//             // Inserção aleatória
+//             std::uniform_int_distribution<size_t> posDist(1, route.route.size());
+//             insertPos = posDist(rng);
+//         }
+
+//         // Atualiza a rota
+//         route.route.insert(route.route.begin() + insertPos, {customerId, deliveryAmount});
+//         vehicles[selectedVehicle].currentCapacity -= deliveryAmount;
+//         updateInventory(period, customerId, currentInventory, deliveryAmount);
+
+//         // Atualiza custo dinamicamente
+//         double addedCost = 0.0;
+//         if (insertPos > 0) {
+//             int prev = route.route[insertPos-1].first;
+//             addedCost += irp.costMatrix[prev][customerId];
+//         }
+//         if (insertPos < route.route.size()-1) {
+//             int next = route.route[insertPos+1].first;
+//             addedCost += irp.costMatrix[customerId][next];
+//             addedCost -= irp.costMatrix[route.route[insertPos-1].first][route.route[insertPos+1].first];
+//         }
+//         route.routeCost += addedCost;
+//     }
+
+//     // Finalização das rotas
+//     for (auto& vehicle : vehicles) {
+//         double returnCost = irp.costMatrix[vehicle.currentLocation][0];
+//         solution.vehicleRoutes[period][vehicle.id].route.push_back({0, 0});
+//         solution.vehicleRoutes[period][vehicle.id].routeCost += returnCost;
+//         vehicle.currentLocation = 0;
+//     }
+
+//     solution.calculateCosts();
+//     return solution;
+// }
+
+
+void Solver::initializeNewVehicleRoute(Solution& solution, int period, int customerId, int quantity) {
+    if (solution.vehicleRoutes[period].size() >= irp.Fleet_Size) return;
+
+    Route newRoute;
+    newRoute.route = {{irp.depots[0].id, 0}};
+    newRoute.addDelivery(customerId, quantity);
+    newRoute.route.push_back({irp.depots[0].id, 0});
+    
+    // Calcula custo corretamente
+    newRoute.routeCost = calculateRouteCost(newRoute);
+    newRoute.remainingCapacity = irp.Capacity - quantity;
+    
+    solution.vehicleRoutes[period].push_back(newRoute);
+}
+
+double Solver::calculateCandidateScore(int customerId, int period, const std::vector<std::vector<int>>& inventory) const {
+    const Customer& cust = irp.customers[customerId-1];
+    double urgency = 1.0 - (inventory[customerId][period] / static_cast<double>(cust.maxLevelInv));
+    double distance = irp.costMatrix[0][customerId];
+    return (0.6 * urgency) + (0.3 * (1.0/distance)) + (0.1 * (static_cast<double>(rand())/RAND_MAX));
+}
+
+void Solver::performInsertion(Route& route, size_t pos, int customerId, int quantity) {
+    if (pos < 1 || pos >= route.route.size()) return;
+
+    int prev = route.route[pos-1].first;
+    int next = route.route[pos].first;
+    
+    // Atualiza custo corretamente
+    route.routeCost += irp.costMatrix[prev][customerId]
+                     + irp.costMatrix[customerId][next]
+                     - irp.costMatrix[prev][next];
+    
+    route.addDelivery(customerId, quantity);
+}
+
+bool Solver::validateRouteConsistency(const Route& route) const {
+    if (route.route.empty()) return false;
+    if (route.route.front().first != 0 || route.route.back().first != 0) return false;
+    if (route.remainingCapacity < 0) return false;
+    
+    // Verificação completa do custo
+    double calculated = 0.0;
+    for (size_t i = 1; i < route.route.size(); ++i) {
+        calculated += irp.costMatrix[route.route[i-1].first][route.route[i].first];
+    }
+    return std::abs(calculated - route.routeCost) < 1e-6;
+}
+
+
+size_t Solver::findBestInsertionPosition(const Route& route, int customerId) const {
+    size_t bestPos = 1;
+    double minCost = std::numeric_limits<double>::max();
+
+    for (size_t i = 1; i < route.route.size(); ++i) {
+        int prev = route.route[i-1].first;
+        int next = route.route[i].first;
+        double cost = irp.costMatrix[prev][customerId] + irp.costMatrix[customerId][next];
+        if (cost < minCost) {
+            minCost = cost;
+            bestPos = i;
+        }
+    }
+    return bestPos;
+}
+
+void Solver::reconstructRoute(Route& route) const {
+    route.routeCost = calculateRouteCost(route);
+    route.remainingCapacity = irp.Capacity;
+    for (const auto& stop : route.route) {
+        route.remainingCapacity -= stop.second;
+    }
+}
+
+Solution Solver::buildRoutesEnhanced(int period, int dmax, std::vector<std::vector<int>>& currentInventory, float alpha) {
+    Solution solution(irp);
+    solution.currentInventory = currentInventory;
+
+    // 1. Inicialização robusta de veículos
+    std::vector<Route> routes;
+    for (int i = 0; i < irp.Fleet_Size; ++i) {
+        Route newRoute;
+        newRoute.route = {{0, 0}, {0, 0}}; // Formato depósito -> depósito
+        newRoute.remainingCapacity = irp.Capacity;
+        newRoute.routeCost = 0.0;
+        routes.push_back(newRoute);
+    }
+
+    // 2. Geração segura da lista de candidatos
+    std::vector<std::pair<int, int>> candidates;
+    for (int i = 1; i <= irp.nCustomers; ++i) {
+        const Customer& cust = irp.customers[i-1];
+        int currentInv = currentInventory[i][period];
+        int needed = cust.demand[period] - currentInv;
+
+        // Critério de necessidade estrito
+        bool needsDelivery = (needed > 0);
+        bool canAddExtra = (currentInv + needed <= cust.maxLevelInv) && (alpha > 0.0f);
+        
+        if (needsDelivery) {
+            candidates.emplace_back(i, needed);
+        } else if (canAddExtra && (static_cast<float>(rand())/RAND_MAX < alpha)) {
+            int maxExtra = cust.maxLevelInv - currentInv;
+            candidates.emplace_back(i, std::min(maxExtra, irp.Capacity));
+        }
+    }
+
+    // 3. Ordenação por urgência de demanda
+    std::sort(candidates.begin(), candidates.end(), 
+        [](const auto& a, const auto& b) { return a.second > b.second; });
+
+    // 4. Alocação garantindo formato e capacidade
+    for (const auto& [customerId, quantity] : candidates) {
+        bool inserted = false;
+        const Customer& cust = irp.customers[customerId-1];
+
+        for (auto& route : routes) {
+            // Verificação de capacidade e inventário
+            if (route.remainingCapacity >= quantity && 
+                (currentInventory[customerId][period] + quantity) <= cust.maxLevelInv) {
+
+                // Sempre insere antes do último depósito
+                size_t insertPos = route.route.size() - 1;
+
+                // Atualização precisa do custo
+                int prev = route.route[insertPos-1].first;
+                int next = route.route[insertPos].first;
+                double costBefore = irp.costMatrix[prev][next];
+                double costAfter = irp.costMatrix[prev][customerId] 
+                                 + irp.costMatrix[customerId][next];
+                
+                route.routeCost += costAfter - costBefore;
+                route.route.insert(route.route.begin() + insertPos, {customerId, quantity});
+                route.remainingCapacity -= quantity;
+                currentInventory[customerId][period] += quantity;
+                inserted = true;
+                break;
+            }
+        }
+
+        // Criação de nova rota com verificações
+        if (!inserted && routes.size() < irp.Fleet_Size) {
+            Route newRoute;
+            newRoute.route = {{0, 0}, {customerId, quantity}, {0, 0}};
+            newRoute.routeCost = irp.costMatrix[0][customerId] + irp.costMatrix[customerId][0];
+            newRoute.remainingCapacity = irp.Capacity - quantity;
+            
+            if ((currentInventory[customerId][period] + quantity) <= cust.maxLevelInv) {
+                routes.push_back(newRoute);
+                currentInventory[customerId][period] += quantity;
+            }
+        }
+    }
+
+    // 5. Pós-processamento e validação
+    solution.vehicleRoutes[period].clear();
+    for (auto& route : routes) {
+        // Remove rotas vazias (apenas depósitos)
+        if (route.route.size() > 2) {
+            // Verificação final de formato
+            if (route.route.front().first != 0 || route.route.back().first != 0) {
+                route.route = {{0, 0}, {0, 0}}; // Reseta rota inválida
+                continue;
+            }
+            
+            // Recalcula custo para garantir precisão
+            route.routeCost = 0.0;
+            for (size_t i = 1; i < route.route.size(); ++i) {
+                route.routeCost += irp.costMatrix[route.route[i-1].first][route.route[i].first];
+            }
+            
+            solution.vehicleRoutes[period].push_back(route);
+        }
+    }
+
+    solution.calculateCosts();
+    return solution;
 }

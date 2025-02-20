@@ -80,7 +80,7 @@ int main(int argc, char* argv[]) {
     else
     std::cout << "Solução inválida "<< std::endl;
     saveResultsToCSV(instanceName, bestD, bestAlpha, totalRouteCost, totalInventoryCost, totalCost, elapsedSeconds.count(), seed, argv[0]);
-
+    bestSolution.printSolution();
     return 0;
 }
 

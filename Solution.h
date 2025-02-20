@@ -22,7 +22,7 @@ public:
 
     Route() : cargaTotal(0), routeCost(0.0), remainingCapacity(0) {}
     void addDelivery(int customerId, int quantity);
-    void removeDelivery(int customerId, int quantity);
+    void removeDelivery(size_t position);
 };
 
 

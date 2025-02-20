@@ -117,46 +117,46 @@ void Solution::printInventoryLevels(int period) const {
 }
 
 
-void Route::addDelivery(int customerId, int quantity) {
-    bool customerFound = false;
+// void Route::addDelivery(int customerId, int quantity) {
+//     bool customerFound = false;
 
-    for (auto& stop : route) {
-        if (stop.first == customerId) {
-            stop.second += quantity;
-            customerFound = true;
-            break;
-        }
-    }
+//     for (auto& stop : route) {
+//         if (stop.first == customerId) {
+//             stop.second += quantity;
+//             customerFound = true;
+//             break;
+//         }
+//     }
 
-    if (!customerFound) {
-        route.push_back({customerId, quantity});
-    }
+//     if (!customerFound) {
+//         route.push_back({customerId, quantity});
+//     }
 
-    cargaTotal += quantity;
-    remainingCapacity -= quantity;
-}
+//     cargaTotal += quantity;
+//     remainingCapacity -= quantity;
+// }
 
-// Remove uma quantidade específica de entrega de um cliente
-void Route::removeDelivery(int customerId, int quantity) {
-    for (auto it = route.begin(); it != route.end(); ++it) {
-        if (it->first == customerId) {
-            if (it->second > quantity) {
-                // Reduz apenas parte da entrega
-                it->second -= quantity;
-                cargaTotal -= quantity;
-                remainingCapacity += quantity;
-            } else {
-                // Remove completamente a entrega se a quantidade for igual ou maior
-                cargaTotal -= it->second;
-                remainingCapacity += it->second;
-                route.erase(it);
-            }
-            return; // A operação foi concluída
-        }
-    }
+// // Remove uma quantidade específica de entrega de um cliente
+// void Route::removeDelivery(int customerId, int quantity) {
+//     for (auto it = route.begin(); it != route.end(); ++it) {
+//         if (it->first == customerId) {
+//             if (it->second > quantity) {
+//                 // Reduz apenas parte da entrega
+//                 it->second -= quantity;
+//                 cargaTotal -= quantity;
+//                 remainingCapacity += quantity;
+//             } else {
+//                 // Remove completamente a entrega se a quantidade for igual ou maior
+//                 cargaTotal -= it->second;
+//                 remainingCapacity += it->second;
+//                 route.erase(it);
+//             }
+//             return; // A operação foi concluída
+//         }
+//     }
 
-  //  std::cerr << "Erro: Cliente " << customerId << " não encontrado na rota." << std::endl;
-}
+//   //  std::cerr << "Erro: Cliente " << customerId << " não encontrado na rota." << std::endl;
+// }
 
 
 double Solution::getTotalCost(){
@@ -167,4 +167,21 @@ calculateCosts();
 
 return routeCost + inventoryCost;
 
+}
+
+
+
+void Route::addDelivery(int customerId, int quantity) {
+    route.insert(route.end() - 1, {customerId, quantity});
+    cargaTotal += quantity;
+    remainingCapacity -= quantity;
+}
+
+
+void Route::removeDelivery(size_t position) {
+    if (position < route.size()) {
+        remainingCapacity += route[position].second;
+        cargaTotal -= route[position].second;
+        route.erase(route.begin() + position);
+    }
 }
